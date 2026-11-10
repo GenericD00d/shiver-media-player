@@ -1,0 +1,8 @@
+{
+  "id": "shiver-media-player",
+  "name": "Shiver Media Player",
+  "author": "GenericD00d",
+  "description": "Watch videos together in a voice channel with shared play, pause and seek controls.",
+  "sdkVersion": 2,
+  "version": "0.1.0"
+}
