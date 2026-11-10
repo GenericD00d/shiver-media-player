@@ -195,7 +195,7 @@ const RESOLVE_TIMEOUT_MS = 45_000;
 
 const resolveMedia = async (
   sourceUrl: string,
-  opts: { maxHeight: number; proxy: string; logger: TLogger },
+  opts: { maxHeight: number; proxy: string; logger: TLogger; noCache?: boolean },
 ): Promise<TMedia> => {
   if (!HTTP_URL.test(sourceUrl)) throw new Error("Paste an http(s) link.");
 
@@ -208,7 +208,8 @@ const resolveMedia = async (
       ytDlp,
       "--dump-single-json",
       "--no-playlist",
-      "--no-warnings",
+      // yt-dlp caches YouTube's player code between runs; a retry after a 403 skips it in case it went stale
+      ...(opts.noCache ? ["--no-cache-dir"] : []),
       "--socket-timeout",
       "15",
       // YouTube needs a JS runtime now, and the server is already running bun
@@ -239,10 +240,13 @@ const resolveMedia = async (
       opts.logger.error("[yt-dlp]", stderr.trim());
 
       // "ERROR: ..." from extractors, "yt-dlp: error: ..." from bad options
-      const reason = stderr.match(/error: (.*)/i)?.[1];
+      const reason = stderr.match(/^(?:ERROR|yt-dlp: error): (.*)$/m)?.[1];
 
       throw new Error(reason ? `Could not load that link: ${reason}` : "Could not load that link.");
     }
+
+    // kept in the logs: when YouTube starts refusing, the reason is usually here
+    for (const w of stderr.match(/^WARNING:.*$/gm) ?? []) opts.logger.log("[yt-dlp]", w);
 
     const info = JSON.parse(stdout) as TYtInfo;
     const media = parseYtDlpInfo(info, sourceUrl);

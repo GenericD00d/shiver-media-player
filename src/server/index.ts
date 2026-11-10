@@ -42,6 +42,8 @@ type TSession = {
   /** every restart runs through here, so spammed pause/seek clicks apply in order */
   chain: Promise<unknown>;
   closed: boolean;
+  /** set after a 403 until playback starts again, so a refused link is re-fetched once, not forever */
+  retried: boolean;
 };
 
 // signed media urls (YouTube's last about 6h) are fetched again after this
@@ -137,7 +139,7 @@ const startAt = async (s: TSession, sec: number) => {
   publish(s.channelId);
 
   if (!s.media || Date.now() - s.resolvedAt > RESOLVE_TTL_MS) {
-    s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), proxy: settings!.proxy(), logger });
+    s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), proxy: settings!.proxy(), logger, noCache: s.retried });
     s.resolvedAt = Date.now();
   }
 
@@ -249,6 +251,7 @@ const startAt = async (s: TSession, sec: number) => {
 
     s.playingSince = Date.now();
     s.status = "playing";
+    s.retried = false;
     publish(s.channelId);
   });
 
@@ -257,6 +260,16 @@ const startAt = async (s: TSession, sec: number) => {
     if (s.proc !== proc) return;
 
     const log = (await stderr).trim();
+
+    // YouTube refused the link (stale, or its player code cached wrong): fetch a fresh one once
+    if (code !== 0 && / 403 /.test(log) && !s.retried && !s.closed) {
+      logger.log(`Got HTTP 403 in channel ${s.channelId}, fetching a fresh link and retrying`);
+      s.retried = true;
+      s.media = null;
+      restart(s, positionOf(s)).catch(() => {});
+
+      return;
+    }
 
     if (code === 0) logger.log(`Finished "${s.media?.title}" in channel ${s.channelId}`);
     else logger.error(`ffmpeg exited with code ${code} in channel ${s.channelId}`, log);
@@ -387,6 +400,7 @@ const onLoad = async (c: TCtx) => {
         stream: null,
         chain: Promise.resolve(),
         closed: false,
+        retried: false,
       };
 
       sessions.set(channelId, session);
