@@ -96,7 +96,11 @@ const download = async (name: TBinary, logger: TLogger): Promise<string> => {
   }
 };
 
-/** dataPath/bin first, so an admin can drop in their own build, then PATH, then download. */
+/**
+ * dataPath/bin first, so an admin can drop in their own build, then our own
+ * download. PATH only where there is nothing to download: distro packages are
+ * routinely years old, and an old yt-dlp or ffmpeg rejects flags used here.
+ */
 const getBinary = (name: TBinary, logger: TLogger): Promise<string> => {
   let found = binaries.get(name);
 
@@ -106,7 +110,9 @@ const getBinary = (name: TBinary, logger: TLogger): Promise<string> => {
 
       if (await fs.exists(local)) return local;
 
-      return Bun.which(name) ?? (await download(name, logger));
+      const fromPath = DOWNLOADS[`${process.platform}_${process.arch}`] ? null : Bun.which(name);
+
+      return fromPath ?? (await download(name, logger));
     })();
 
     // a failed lookup is retried on the next call rather than cached
@@ -230,7 +236,8 @@ const resolveMedia = async (
     if (code !== 0) {
       opts.logger.error("[yt-dlp]", stderr.trim());
 
-      const reason = stderr.match(/ERROR: (.*)/)?.[1];
+      // "ERROR: ..." from extractors, "yt-dlp: error: ..." from bad options
+      const reason = stderr.match(/error: (.*)/i)?.[1];
 
       throw new Error(reason ? `Could not load that link: ${reason}` : "Could not load that link.");
     }

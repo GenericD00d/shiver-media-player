@@ -281,7 +281,8 @@ const restart = async (s: TSession, sec: number) => {
   try {
     await run(s, () => startAt(s, sec));
   } catch (err) {
-    ctx?.logger.error(`Playback failed in channel ${s.channelId}`, err);
+    // an Error logs as {}, so the message is passed on its own
+    ctx?.logger.error(`Playback failed in channel ${s.channelId}:`, err instanceof Error ? err.message : err);
     endSession(s.channelId);
     throw err;
   }
@@ -292,8 +293,8 @@ const onLoad = async (c: TCtx) => {
   setBinDir(path.join(c.dataPath, "bin"));
 
   // fetched in the background, so the first play does not wait on a download
-  getBinary("ffmpeg", c.logger).catch((err) => c.logger.error("ffmpeg unavailable", err));
-  getBinary("yt-dlp", c.logger).catch((err) => c.logger.error("yt-dlp unavailable", err));
+  getBinary("ffmpeg", c.logger).catch((err) => c.logger.error("ffmpeg unavailable:", String(err)));
+  getBinary("yt-dlp", c.logger).catch((err) => c.logger.error("yt-dlp unavailable:", String(err)));
 
   const s = await c.settings.register([
     {
@@ -453,7 +454,7 @@ const onLoad = async (c: TCtx) => {
     requires: Permission.MANAGE_PLUGINS,
     ephemeral: true,
     executes: async () => {
-      updateYtDlp(c.logger).catch((err) => c.logger.error("yt-dlp update failed", err));
+      updateYtDlp(c.logger).catch((err) => c.logger.error("yt-dlp update failed:", String(err)));
 
       return "Downloading the latest yt-dlp. Follow it in the plugin logs.";
     },
