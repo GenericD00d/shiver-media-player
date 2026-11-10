@@ -318,7 +318,10 @@ const onLoad = async (c: TCtx) => {
     videoBitrate: () => (/^\d+(\.\d+)?[kKmM]?$/.test(s.get("videoBitrate").trim()) ? s.get("videoBitrate").trim() : "2500k"),
   };
 
-  c.ui.enable({ [PluginSlot.VOICE_CONTROLS]: Permission.JOIN_VOICE_CHANNELS });
+  c.ui.enable({
+    [PluginSlot.VOICE_CONTROLS]: Permission.JOIN_VOICE_CHANNELS,
+    [PluginSlot.TOPBAR_RIGHT]: Permission.JOIN_VOICE_CHANNELS,
+  });
 
   c.events.on("voice:runtime_closed", ({ channelId }) => endSession(channelId));
 

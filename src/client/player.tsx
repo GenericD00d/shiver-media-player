@@ -1,4 +1,4 @@
-import { createCallAction, useCanUseAction, usePush } from "@sharkord/plugin-sdk/client";
+import { createCallAction, useCanUseAction, usePush, useStoreSelector } from "@sharkord/plugin-sdk/client";
 import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@sharkord/ui";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
@@ -225,7 +225,7 @@ const PlayerPanel = ({ channelId }: { channelId: number }) => {
   );
 };
 
-const PlayerButton = ({ channelId }: { channelId: number }) => {
+const PlayerButton = ({ channelId, side = "top" }: { channelId: number; side?: "top" | "bottom" }) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -235,7 +235,7 @@ const PlayerButton = ({ channelId }: { channelId: number }) => {
           <ScreenIcon active={open} />
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" style={{ width: "auto" }}>
+      <PopoverContent side={side} align={side === "top" ? "center" : "end"} style={{ width: "auto" }}>
         {/* mounted only while open: the panel's push listener and ticker cost nothing when closed */}
         <PlayerPanel channelId={channelId} />
       </PopoverContent>
@@ -243,4 +243,19 @@ const PlayerButton = ({ channelId }: { channelId: number }) => {
   );
 };
 
-export { PlayerButton };
+/**
+ * The call view's own control bar has no plugin slot, so the top bar is the
+ * closest place: shown under the same rule as Sharkord's call buttons there,
+ * while the channel being viewed is the call you are in.
+ */
+const TopbarPlayerButton = () => {
+  const channelId = useStoreSelector((s) =>
+    s.currentVoiceChannelId !== undefined && s.selectedChannelId === s.currentVoiceChannelId
+      ? s.currentVoiceChannelId
+      : undefined,
+  );
+
+  return channelId === undefined ? null : <PlayerButton channelId={channelId} side="bottom" />;
+};
+
+export { PlayerButton, TopbarPlayerButton };
