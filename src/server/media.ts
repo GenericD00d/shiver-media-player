@@ -195,7 +195,7 @@ const RESOLVE_TIMEOUT_MS = 45_000;
 
 const resolveMedia = async (
   sourceUrl: string,
-  opts: { maxHeight: number; proxy: string; logger: TLogger; noCache?: boolean },
+  opts: { maxHeight: number; proxy: string; logger: TLogger; fallback?: boolean },
 ): Promise<TMedia> => {
   if (!HTTP_URL.test(sourceUrl)) throw new Error("Paste an http(s) link.");
 
@@ -208,13 +208,11 @@ const resolveMedia = async (
       ytDlp,
       "--dump-single-json",
       "--no-playlist",
-      // yt-dlp caches YouTube's player code between runs; a retry after a 403 skips it in case it went stale
-      ...(opts.noCache ? ["--no-cache-dir"] : []),
       "--socket-timeout",
       "15",
-      // YouTube needs a JS runtime now, and the server is already running bun
-      "--js-runtimes",
-      "bun",
+      // YouTube's JS challenge unlocks its TV client. Some servers get 403s on that
+      // client's links, so the fallback skips the challenge and gets another client.
+      ...(opts.fallback ? ["--no-js-runtimes", "--no-cache-dir"] : ["--js-runtimes", "bun"]),
       // h264/aac first: cheapest to decode, and the most widely supported
       "-f",
       `bv*[height<=${h}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${h}]+ba/b[height<=${h}]/bv*+ba/b`,
