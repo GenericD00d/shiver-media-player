@@ -42,7 +42,7 @@ type TSession = {
   /** every restart runs through here, so spammed pause/seek clicks apply in order */
   chain: Promise<unknown>;
   closed: boolean;
-  /** set after a 403 until playback starts again: the link is re-fetched once, the fallback way, not forever */
+  /** set after a 403 until playback starts again: the link is re-fetched once, the other way, not forever */
   retried: boolean;
 };
 
@@ -60,6 +60,12 @@ const IDLE: TPlayerState = {
 };
 
 const sessions = new Map<number, TSession>();
+/**
+ * Whether yt-dlp skips YouTube's JS challenge. Flipped when a retry after a 403
+ * plays, so a server that needs the fallback stops paying a failed first try.
+ * ponytail: in memory, relearned after a restart with one failed try
+ */
+let useFallback = false;
 let ctx: TCtx | null = null;
 let settings: { maxHeight: () => number; videoBitrate: () => string; proxy: () => string } | null = null;
 
@@ -139,7 +145,7 @@ const startAt = async (s: TSession, sec: number) => {
   publish(s.channelId);
 
   if (!s.media || Date.now() - s.resolvedAt > RESOLVE_TTL_MS) {
-    s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), proxy: settings!.proxy(), logger, fallback: s.retried });
+    s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), proxy: settings!.proxy(), logger, fallback: useFallback !== s.retried });
     s.resolvedAt = Date.now();
   }
 
@@ -251,6 +257,12 @@ const startAt = async (s: TSession, sec: number) => {
 
     s.playingSince = Date.now();
     s.status = "playing";
+
+    if (s.retried) {
+      useFallback = !useFallback;
+      logger.log(`The retry worked: YouTube links are now fetched ${useFallback ? "without" : "with"} the JS challenge first`);
+    }
+
     s.retried = false;
     publish(s.channelId);
   });
