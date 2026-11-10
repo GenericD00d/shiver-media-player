@@ -20,6 +20,7 @@ import {
   VIDEO_PT,
   type TMedia,
 } from "./media";
+import { ffmpegProxy, PROXY_URL, stopBridge } from "./proxy";
 
 type TCtx = PluginContext<TSharkord>;
 
@@ -58,7 +59,7 @@ const IDLE: TPlayerState = {
 
 const sessions = new Map<number, TSession>();
 let ctx: TCtx | null = null;
-let settings: { maxHeight: () => number; videoBitrate: () => string } | null = null;
+let settings: { maxHeight: () => number; videoBitrate: () => string; proxy: () => string } | null = null;
 
 const positionOf = (s: TSession): number => {
   const p = s.offsetSec + (s.playingSince ? (Date.now() - s.playingSince) / 1000 : 0);
@@ -136,11 +137,12 @@ const startAt = async (s: TSession, sec: number) => {
   publish(s.channelId);
 
   if (!s.media || Date.now() - s.resolvedAt > RESOLVE_TTL_MS) {
-    s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), logger });
+    s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), proxy: settings!.proxy(), logger });
     s.resolvedAt = Date.now();
   }
 
   const ffmpeg = await getBinary("ffmpeg", logger);
+  const httpProxy = await ffmpegProxy(settings!.proxy());
 
   if (s.closed) return;
 
@@ -224,6 +226,7 @@ const startAt = async (s: TSession, sec: number) => {
         startSec: sec,
         maxHeight: settings!.maxHeight(),
         videoBitrate: settings!.videoBitrate(),
+        httpProxy,
         rtpHost: ip,
         videoPort: vt.tuple.localPort,
         audioPort: at.tuple.localPort,
@@ -311,11 +314,27 @@ const onLoad = async (c: TCtx) => {
       type: "string",
       defaultValue: "2500k",
     },
+    {
+      key: "proxy",
+      name: "Proxy (optional)",
+      description:
+        "Fetch videos through a proxy, e.g. when a site blocks the server's IP. http://host:port or socks5://host:port, optionally with user:pass@. Leave empty for none.",
+      type: "string",
+      defaultValue: "",
+    },
   ] as const);
 
   settings = {
     maxHeight: () => s.get("maxHeight") || 720,
     videoBitrate: () => (/^\d+(\.\d+)?[kKmM]?$/.test(s.get("videoBitrate").trim()) ? s.get("videoBitrate").trim() : "2500k"),
+    proxy: () => {
+      const p = s.get("proxy").trim();
+
+      // refused rather than ignored, so a typo never quietly falls back to the server's own IP
+      if (p && !PROXY_URL.test(p)) throw new Error("The proxy setting is invalid. Use http://host:port or socks5://host:port.");
+
+      return p;
+    },
   };
 
   c.ui.enable({
@@ -468,6 +487,7 @@ const onLoad = async (c: TCtx) => {
 
 const onUnload = () => {
   for (const channelId of [...sessions.keys()]) endSession(channelId);
+  stopBridge();
 
   ctx = null;
 };

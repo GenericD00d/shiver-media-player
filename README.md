@@ -57,6 +57,12 @@ A binary already in that folder, or on the server's `PATH`, is used instead.
 - **Video bitrate** (default `2500k`): limited by your server's upload. Each
   active channel costs one stream's worth of upload per viewer, plus one
   real-time x264 encode of CPU.
+- **Proxy** (optional, empty by default): fetches every video through a proxy,
+  for when a site blocks the server's IP. Takes `http://host:port`,
+  `socks5://host:port` or `socks5h://host:port`, optionally with `user:pass@`.
+  ffmpeg can't use SOCKS itself, so for SOCKS the plugin runs a small HTTP proxy
+  on `127.0.0.1` that forwards through it. An invalid value makes playback fail
+  instead of quietly bypassing the proxy.
 
 ## Permissions
 
@@ -71,7 +77,7 @@ http(s), so a link can never make ffmpeg read files on the server.
 
 - **A site stopped working / "Sign in to confirm you're not a bot"**: run
   `/shiver-update-yt-dlp`. If YouTube keeps blocking the server's IP, export
-  cookies to `<data-dir>/plugin-data/shiver-media-player/bin/cookies.txt`.
+  cookies to `<data-dir>/plugin-data/shiver-media-player/bin/cookies.txt`, or set the **Proxy** setting.
 - Errors from yt-dlp and ffmpeg are in the plugin's **Logs** tab.
 
 ## Development

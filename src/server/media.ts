@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import { ffmpegProxy } from "./proxy";
 
 type TLogger = { log: (...m: unknown[]) => void; error: (...m: unknown[]) => void };
 
@@ -76,7 +77,7 @@ const download = async (name: TBinary, logger: TLogger): Promise<string> => {
 
       const archiveName = path.basename(url).replace(/\.tar\.gz$/, "");
       const files = (await fs.readdir(tmp, { recursive: true })) as string[];
-      const found = files.find((f) => [exe(name), archiveName].includes(path.basename(f)));
+      const found = files.find((f) => [exe(name), exe(archiveName)].includes(path.basename(f)));
 
       if (!found) throw new Error(`${name} not found inside ${url}`);
 
@@ -194,7 +195,7 @@ const RESOLVE_TIMEOUT_MS = 45_000;
 
 const resolveMedia = async (
   sourceUrl: string,
-  opts: { maxHeight: number; logger: TLogger },
+  opts: { maxHeight: number; proxy: string; logger: TLogger },
 ): Promise<TMedia> => {
   if (!HTTP_URL.test(sourceUrl)) throw new Error("Paste an http(s) link.");
 
@@ -217,6 +218,7 @@ const resolveMedia = async (
       "-f",
       `bv*[height<=${h}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${h}]+ba/b[height<=${h}]/bv*+ba/b`,
       ...((await fs.exists(cookies)) ? ["--cookies", cookies] : []),
+      ...(opts.proxy ? ["--proxy", opts.proxy] : []),
       // ends option parsing, so a url can never be read as a flag
       "--",
       sourceUrl,
@@ -251,7 +253,7 @@ const resolveMedia = async (
 
     if (!info.requested_formats?.length && (unknownTracks || unknownLength)) {
       const input = media.video ?? media.audio!;
-      const probed = parseProbe(await probe(await getBinary("ffmpeg", opts.logger), input));
+      const probed = parseProbe(await probe(await getBinary("ffmpeg", opts.logger), input, await ffmpegProxy(opts.proxy)));
 
       if (!probed.video && !probed.audio) throw new Error("No playable video or audio was found at that link.");
 
@@ -267,8 +269,8 @@ const resolveMedia = async (
 };
 
 /** `ffmpeg -i` with no output prints the streams and exits, which is all a probe needs */
-const probe = async (ffmpeg: string, input: TInput): Promise<string> => {
-  const proc = Bun.spawn([ffmpeg, "-hide_banner", ...sourceArgs(input), "-i", input.url], {
+const probe = async (ffmpeg: string, input: TInput, httpProxy?: string): Promise<string> => {
+  const proc = Bun.spawn([ffmpeg, "-hide_banner", ...sourceArgs(input, httpProxy), "-i", input.url], {
     stdin: "ignore",
     stdout: "ignore",
     stderr: "pipe",
@@ -307,6 +309,8 @@ type TFfmpegOptions = {
   startSec: number;
   maxHeight: number;
   videoBitrate: string;
+  /** an http:// proxy for every fetch, see ffmpegProxy */
+  httpProxy?: string;
   rtpHost: string;
   videoPort: number;
   audioPort: number;
@@ -315,14 +319,14 @@ type TFfmpegOptions = {
 };
 
 /** how ffmpeg opens a resolved url: http(s) only, with the site's headers */
-const sourceArgs = (input: TInput): string[] => {
+const sourceArgs = (input: TInput, httpProxy?: string): string[] => {
   const headers = Object.entries(input.headers)
     .map(([k, v]) => `${k}: ${v}\r\n`)
     .join("");
 
   return [
     "-protocol_whitelist",
-    "http,https,tls,tcp,crypto",
+    "http,https,tls,tcp,crypto,httpproxy",
     "-reconnect",
     "1",
     "-reconnect_streamed",
@@ -330,12 +334,14 @@ const sourceArgs = (input: TInput): string[] => {
     "-reconnect_delay_max",
     "5",
     ...(headers ? ["-headers", headers] : []),
+    // YouTube's media urls only work from the IP that resolved them, so ffmpeg goes through the proxy too
+    ...(httpProxy ? ["-http_proxy", httpProxy] : []),
   ];
 };
 
-const inputArgs = (input: TInput, startSec: number): string[] => {
+const inputArgs = (input: TInput, startSec: number, httpProxy?: string): string[] => {
   return [
-    ...sourceArgs(input),
+    ...sourceArgs(input, httpProxy),
     // before -i: seeks the input instead of decoding up to the position
     ...(startSec > 0 ? ["-ss", startSec.toFixed(2)] : []),
     // paced to realtime, since this is a live stream to the viewers
@@ -368,12 +374,12 @@ const buildFfmpegArgs = (o: TFfmpegOptions): string[] => {
   const generated = (graph: string) =>
     add([...(remaining ? ["-t", remaining.toFixed(2)] : []), "-re", "-f", "lavfi", "-i", graph]);
 
-  const v = media.video ? add(inputArgs(media.video, o.startSec)) : generated("color=c=black:s=640x360:r=25");
+  const v = media.video ? add(inputArgs(media.video, o.startSec, o.httpProxy)) : generated("color=c=black:s=640x360:r=25");
   const a =
     media.audio && media.audio === media.video
       ? v
       : media.audio
-        ? add(inputArgs(media.audio, o.startSec))
+        ? add(inputArgs(media.audio, o.startSec, o.httpProxy))
         : generated("anullsrc=r=48000:cl=stereo");
 
   const h = Math.min(1080, Math.max(144, Math.round(o.maxHeight)));

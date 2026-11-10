@@ -1,6 +1,6 @@
 {
   "name": "shiver-media-player",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "MIT",
   "module": "src/server/index.ts",
   "type": "module",
