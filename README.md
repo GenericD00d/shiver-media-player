@@ -1,4 +1,4 @@
-<img src="logo.png" alt="" width="128" align="right">
+<p align="center"><img src="logo.png" alt="Shiver Media Player logo" width="160"></p>
 
 # Shiver Media Player
 
