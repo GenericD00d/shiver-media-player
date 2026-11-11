@@ -1,3 +1,5 @@
+<img src="logo.png" alt="" width="128" align="right">
+
 # Shiver Media Player
 
 A Sharkord plugin for watching videos together in a voice channel. Paste a link,
