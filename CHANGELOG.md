@@ -2,7 +2,7 @@
 
 Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
-## Unreleased
+## 0.0.7 (2026-11-13)
 
 ### Added
 
