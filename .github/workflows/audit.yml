@@ -1,0 +1,29 @@
+# The dependency audit: on every push and pull request, and weekly, so an advisory published while
+# nothing is pushed still shows up (docs/standards.md, Security baseline rule 4). A failed scheduled
+# run emails the owner. Nothing here needs a secret.
+name: Dependency audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.4.0
+      # reads the lockfile only
+      - run: bun audit
