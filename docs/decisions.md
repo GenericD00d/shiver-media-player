@@ -37,9 +37,13 @@ temp-share plugin's.
 
 ## Open items
 
-- **Requests to the server's own network** aren't refused yet. See SECURITY.md.
+- **Requests to the server's own network** aren't refused yet. The check is in place and tested
+  (`isPrivateAddress` in `src/server/addresses.ts`, ported from Shiver's companion plugin); what's
+  left is applying it to every connection yt-dlp and ffmpeg make, on the address actually
+  connected to, as the standard's code rule 1 asks. See SECURITY.md.
 - **The downloaded binaries** aren't pinned or verified yet, and yt-dlp comes from its nightly
-  channel. See SECURITY.md.
+  channel. Pinning needs each release's SHA-256 per platform, written into `DOWNLOADS` in
+  `src/server/media.ts`, with yt-dlp moved to its stable channel. See SECURITY.md.
 - **No cap on simultaneous streams**, beyond one per voice channel.
 
 ## Bug log
