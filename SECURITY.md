@@ -59,13 +59,16 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
 - **ffmpeg is limited to http and https** (`-protocol_whitelist`), so no link or page can make it
   read a file on the server.
 - **Requests aren't limited to public addresses yet.** A link, or a playlist it leads to, can make
-  the server fetch an address on its own network. This branch routes every request through a check
-  on the address actually connected to.
+  the server fetch an address on its own network. The check for it is in place and tested
+  (`src/server/addresses.ts`); applying it to every connection is an open item in
+  [docs/decisions.md](docs/decisions.md#open-items). Until then, the Permissions section of the
+  README applies: grant playback only to members you trust with the server's network.
 - **The binaries aren't verified yet.** They come from GitHub over HTTPS, the same builds Sharkord's
-  own plugins download. This branch pins each one to a version and a SHA-256.
+  own plugins download. Pinning each to a version and a SHA-256 is an open item in
+  [docs/decisions.md](docs/decisions.md#open-items).
 
 ## Review history
 
 | Date | Review | Fixed in | What it found |
 |---|---|---|---|
-| 2026-11-13 | Review of the four Shiver repos, internal and LLM-assisted | This branch | Requests could reach the server's own network; downloaded binaries weren't verified, and yt-dlp came from its nightly channel |
+| 2026-11-13 | Review of the four Shiver repos, internal and LLM-assisted | This branch, in part | Requests could reach the server's own network (check added, not yet applied); downloaded binaries weren't verified, and yt-dlp came from its nightly channel (open); no cap on streams (fixed); titles kept invisible marks (fixed) |
