@@ -28,6 +28,21 @@ bun test
 bun run build     # writes dist/shiver-media-player/
 ```
 
+### Bumping the binary pins
+
+The yt-dlp and ffmpeg downloads are pinned in `DOWNLOADS` in `src/server/media.ts`: a release URL
+and a SHA-256 for each of `linux_x64`, `linux_arm64` and `win32_x64`.
+
+1. **yt-dlp**: pick a stable release of `yt-dlp/yt-dlp`, and take the three hashes (`yt-dlp_linux`,
+   `yt-dlp_linux_aarch64`, `yt-dlp.exe`) from its `SHA2-256SUMS`. Download one and check it
+   matches. Optionally, check `SHA2-256SUMS.sig` with yt-dlp's public key first.
+2. **ffmpeg**: `diogomartino/plugin-binaries` publishes no checksums, so download the three
+   archives and take their SHA-256 (`sha256sum`), on a machine you trust. Compare them with the
+   digests GitHub shows for the release's assets.
+3. Change the tag in `YT_DLP` or `FFMPEG` and the hashes together, then run `bun test`
+   (`binaries.test.ts` checks each pin is a fixed release with a hash) and play a video.
+4. Note the new versions in CHANGELOG.md.
+
 ## Signing and publishing
 
 ```bash

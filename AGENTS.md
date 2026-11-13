@@ -71,6 +71,7 @@ SECURITY.md explains why each one matters.
 | No more than the set number of channels stream at once, and a member can start only so many videos a minute | `play` in `src/server/index.ts`, `src/server/limits.ts` | `src/server/limits.test.ts` |
 | Titles shown to viewers lose invisible and direction-changing marks | `parseYtDlpInfo`, `src/server/text.ts` | `src/server/text.test.ts` |
 | Addresses on the server's own network are refused by `isPrivateAddress`, which keeps the companion plugin's test vectors | `src/server/addresses.ts` | `src/server/addresses.test.ts` |
+| Downloaded binaries are pinned to a version and SHA-256, and checked before they run | `DOWNLOADS`, `download` and `latestYtDlpPin` in `src/server/media.ts` | `src/server/binaries.test.ts` |
 
 ## Conventions
 

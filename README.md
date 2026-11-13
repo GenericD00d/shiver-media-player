@@ -48,7 +48,12 @@ install it from the server's plugins. By hand:
 
 On first load the plugin downloads `ffmpeg` and `yt-dlp` into
 `<data-dir>/plugin-data/shiver-media-player/bin` (Linux x64/arm64, Windows x64).
-A binary already in that folder, or on the server's `PATH`, is used instead.
+Each download is a fixed release, checked against its SHA-256 before it is ever
+run; a file that doesn't match is thrown away and playback says so.
+`/shiver-update-yt-dlp` fetches yt-dlp's latest stable release, checked against
+that release's own `SHA2-256SUMS`. A binary you put in that folder yourself, or
+one on the server's `PATH` where there is no download, is used as it is: that is
+your choice, and the plugin doesn't check it.
 
 ## Usage
 

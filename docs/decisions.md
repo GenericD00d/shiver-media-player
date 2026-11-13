@@ -44,15 +44,24 @@ as there are voice channels, one after another.
 videos a minute (`src/server/limits.ts`). Replacing what plays in your own channel doesn't count
 against the cap.
 
+## 2026-11-13: Pinned binaries, and yt-dlp from its stable releases
+
+**Why:** the plugin downloaded the latest yt-dlp nightly and the latest ffmpeg build and ran them
+unchecked, so whoever could change those release pages decided what the server ran. Decision D6 of
+the family review had already agreed a pinned stable yt-dlp.
+
+**Consequences:** `DOWNLOADS` pins yt-dlp 2026.10.26 and plugin-binaries 0.0.1, with a SHA-256 for
+each platform, checked before a download is written. yt-dlp's hashes are from its `SHA2-256SUMS`;
+ffmpeg's are trust on first use, since its releases publish none. `/shiver-update-yt-dlp` takes
+the latest stable yt-dlp only when that release's `SHA2-256SUMS` has a matching line. Bumping the
+pins is in RELEASING.md. Checking yt-dlp's signature on `SHA2-256SUMS` is left for later.
+
 ## Open items
 
 - **Requests to the server's own network** aren't refused yet. The check is in place and tested
   (`isPrivateAddress` in `src/server/addresses.ts`, ported from Shiver's companion plugin); what's
   left is applying it to every connection yt-dlp and ffmpeg make, on the address actually
   connected to, as the standard's code rule 1 asks. See SECURITY.md.
-- **The downloaded binaries** aren't pinned or verified yet, and yt-dlp comes from its nightly
-  channel. Pinning needs each release's SHA-256 per platform, written into `DOWNLOADS` in
-  `src/server/media.ts`, with yt-dlp moved to its stable channel. See SECURITY.md.
 
 ## Bug log
 

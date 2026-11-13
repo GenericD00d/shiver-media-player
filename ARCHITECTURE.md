@@ -56,8 +56,9 @@ manifest.json             the plugin's id, version and SDK version
   session run every start, pause and seek in order. A session ends when its video ends, when it is
   stopped, or when the last person leaves the channel.
 - **`src/server/media.ts`**:
-  - binaries: `getBinary` uses one in the plugin's `bin` folder, else downloads one (`download`,
-    `DOWNLOADS`); `updateYtDlp` fetches yt-dlp again;
+  - binaries: `getBinary` uses one in the plugin's `bin` folder, else downloads the pinned one
+    (`download`, `DOWNLOADS`), refusing it unless its SHA-256 matches; `updateYtDlp` fetches the
+    latest stable yt-dlp, pinned to its release's `SHA2-256SUMS` (`latestYtDlpPin`);
   - yt-dlp: `resolveMedia` runs it with `--dump-single-json`, and `parseYtDlpInfo` turns its output
     into a `TMedia` (`toInput` keeps http(s) URLs only); `probe` and `parseProbe` ask ffmpeg about a
     direct link;

@@ -10,6 +10,10 @@ Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
 ### Security
 
+- yt-dlp and ffmpeg are downloaded from fixed releases and checked against their SHA-256 before they
+  run; a file that doesn't match is refused. yt-dlp now comes from its stable releases (2026.10.26)
+  rather than nightly builds, and `/shiver-update-yt-dlp` takes the latest stable one only when it
+  matches that release's own `SHA2-256SUMS`.
 - Titles from the linked sites lose invisible and direction-changing marks before viewers see them.
 - `scripts/setup.ts` builds against Sharkord's v0.0.30 release and a pinned builder, not whatever
   their main branches hold.
