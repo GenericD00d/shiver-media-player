@@ -106,10 +106,10 @@ http(s), so a link can never make ffmpeg read files on the server.
 ## Building
 
 `bun run setup` once, then `bun run build`. `bun test` covers the yt-dlp
-parsing, the probing, and the ffmpeg command line. `bun run check-types`
-type-checks the code (ignore errors reported from inside the linked SDK
-packages). `scripts/check.sh` runs every check; [AGENTS.md](AGENTS.md) has the
-rules not to break, and [RELEASING.md](RELEASING.md) the release steps.
+parsing, the probing, and the ffmpeg command line. `scripts/check-types.sh`
+type-checks the plugin's own code, and only counts the errors the linked SDK
+reports about itself. `scripts/check.sh` runs every check; [AGENTS.md](AGENTS.md)
+has the rules not to break, and [RELEASING.md](RELEASING.md) the release steps.
 
 ## The Shiver family
 

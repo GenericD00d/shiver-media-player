@@ -7,7 +7,10 @@ const targets: string[] = [];
 const socks = net.createServer((c) => {
   let step = 0;
 
-  c.on("data", (d) => {
+  c.on("data", (chunk) => {
+    // always a Buffer here, since no encoding is set, but the types allow a string
+    const d = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+
     if (step === 0) {
       c.write(Buffer.from([5, 2]));
     } else if (step === 1) {

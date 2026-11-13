@@ -35,7 +35,7 @@ bun audit
 
 step "Types"
 if [ -d .repos/sharkord ]; then
-  bun run check-types
+  scripts/check-types.sh
 else
   echo "skipped: run bun run setup first"
 fi

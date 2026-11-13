@@ -30,13 +30,14 @@ for (const [name, ref, packages] of repos) {
   await $`git -C ${dir} fetch -q --depth 1 origin ${ref}`;
   await $`git -C ${dir} checkout -q --force --detach FETCH_HEAD`;
 
+  // from the pinned commit's own lockfile, so its dependencies are pinned too.
   // --ignore-scripts: sharkord trusts mediasoup, whose install step compiles a
   // native worker from source on every core. Plugins only need its types.
-  await $`bun install --ignore-scripts`.cwd(dir);
+  await $`bun install --frozen-lockfile --ignore-scripts`.cwd(dir);
   for (const pkg of packages) await $`bun link`.cwd(`${dir}/${pkg}`);
 }
 
-await $`bun install`;
+await $`bun install --frozen-lockfile`;
 await $`bun link ${links}`;
 
 console.log(

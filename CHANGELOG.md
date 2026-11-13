@@ -18,7 +18,7 @@ Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
 - The docs follow the Shiver standard ([docs/standards.md](docs/standards.md)): AGENTS.md,
   ARCHITECTURE.md, SECURITY.md, RELEASING.md and docs/decisions.md are new. CI checks the docs, the
-  versions, the tests and the dependencies.
+  versions, the tests, the dependencies and the types.
 - `bun run publish` publishes a release, as in the temp-share plugin.
 
 ## 0.0.6 (2026-11-10)

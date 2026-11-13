@@ -43,7 +43,7 @@ src/contract.ts           TSharkord and TPlayerState, shared by both halves
 build.ts                  builds the plugin with Sharkord's builder into dist/shiver-media-player/
 publish.ts                publishes a release with Sharkord's builder
 scripts/setup.ts          clones and links the SDK and the builder into .repos/
-scripts/check.sh          every local check; check-docs.py and check-version.py beside it
+scripts/check.sh          every local check; check-docs.py, check-version.py and check-types.sh beside it
 manifest.json             the plugin's id, version and SDK version
 ```
 

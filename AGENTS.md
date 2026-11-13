@@ -35,7 +35,7 @@ The pieces:
 
 ```bash
 bun test                        # unit tests: yt-dlp parsing, probing, the ffmpeg command, the proxy
-bun run check-types             # type check; ignore errors from inside the linked SDK packages
+scripts/check-types.sh          # type check: fails on this repo's errors, counts the linked SDK's
 bun run build                   # writes dist/shiver-media-player/
 python3 scripts/check-docs.py   # the docs follow docs/standards.md
 python3 scripts/check-version.py
