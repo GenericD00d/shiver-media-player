@@ -76,6 +76,8 @@ Playback stops by itself when the video ends or the last person leaves the chann
   ffmpeg can't use SOCKS itself, so for SOCKS the plugin runs a small HTTP proxy
   on `127.0.0.1` that forwards through it. An invalid value makes playback fail
   instead of quietly bypassing the proxy.
+- **Simultaneous streams** (default 3): how many voice channels can play at once
+  across the server. Each member can also start at most 6 videos a minute.
 
 ## Permissions
 
@@ -92,7 +94,7 @@ http(s), so a link can never make ffmpeg read files on the server.
   they must be on the server's `PATH` or in the `bin` folder.
 - Live streams can't be seeked.
 - Each active channel costs one real-time encode, so a small server can carry
-  only a few at once.
+  only a few at once; **Simultaneous streams** sets how many.
 
 ## Troubleshooting
 

@@ -35,7 +35,8 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
 | The pages and media those links lead to | yt-dlp and ffmpeg | ffmpeg reads http and https only; resolved media URLs must be http(s); timeouts on resolving and probing |
 | Where those requests go | The server's network | Not limited yet: see [Design decisions](#design-decisions-worth-knowing) |
 | The binaries it downloads | First load, and `/shiver-update-yt-dlp` | Not verified yet: see [Design decisions](#design-decisions-worth-knowing) |
-| Members controlling playback | The actions | `JOIN_VOICE_CHANNELS`, which the owner can narrow per role; the update command needs `MANAGE_PLUGINS` |
+| Members controlling playback | The actions | `JOIN_VOICE_CHANNELS`, which the owner can narrow per role; the update command needs `MANAGE_PLUGINS`; a server-wide cap on simultaneous streams and a per-member rate on plays |
+| Titles the linked sites report | The player, for every viewer | Invisible and direction-changing marks dropped, controls turned into spaces, capped |
 
 ## In scope
 

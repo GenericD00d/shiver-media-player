@@ -49,6 +49,7 @@ Releases are in [RELEASING.md](RELEASING.md).
 src/server/index.ts   the plugin's entry: settings, actions, the command, one session per channel
 src/server/media.ts   the binaries, yt-dlp resolving, ffmpeg's command line
 src/server/proxy.ts   the proxy setting, and the HTTP bridge ffmpeg uses for SOCKS proxies
+src/server/limits.ts  the caps on streams and plays; text.ts cleans titles; addresses.ts public-only checks
 src/client/           the button and controls (player.tsx), and the slots they go in (index.ts)
 src/contract.ts       the types both halves share
 scripts/              setup.ts (the SDK), check.sh, check-docs.py, check-version.py
@@ -67,6 +68,9 @@ SECURITY.md explains why each one matters.
 | Media URLs yt-dlp resolves are used only if they are http(s) | `toInput` in `src/server/media.ts` | `src/server/media.test.ts` |
 | The proxy setting is a plain `http://` or `socks5://` address, or playback fails rather than quietly bypassing it | `PROXY_URL` in `src/server/proxy.ts` | `src/server/proxy.test.ts` |
 | Every action states the permission it needs | `src/server/index.ts` | Review |
+| No more than the set number of channels stream at once, and a member can start only so many videos a minute | `play` in `src/server/index.ts`, `src/server/limits.ts` | `src/server/limits.test.ts` |
+| Titles shown to viewers lose invisible and direction-changing marks | `parseYtDlpInfo`, `src/server/text.ts` | `src/server/text.test.ts` |
+| Addresses on the server's own network are refused by `isPrivateAddress`, which keeps the companion plugin's test vectors | `src/server/addresses.ts` | `src/server/addresses.test.ts` |
 
 ## Conventions
 

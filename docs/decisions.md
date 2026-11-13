@@ -35,6 +35,12 @@ the same files, checks and security baseline ([standards.md](standards.md)).
 **Consequences:** the standard docs are new, CI runs the checks, and `publish.ts` matches the
 temp-share plugin's.
 
+## 2026-11-13: Caps on streams and plays
+
+**Why:** each stream is a real-time encode, so any member able to play could otherwise start as many as there are voice channels, one after another.
+
+**Consequences:** **Simultaneous streams** (default 3) caps the server, and each member can start 6 videos a minute (`src/server/limits.ts`). Replacing what plays in your own channel doesn't count against the cap.
+
 ## Open items
 
 - **Requests to the server's own network** aren't refused yet. The check is in place and tested
@@ -44,7 +50,6 @@ temp-share plugin's.
 - **The downloaded binaries** aren't pinned or verified yet, and yt-dlp comes from its nightly
   channel. Pinning needs each release's SHA-256 per platform, written into `DOWNLOADS` in
   `src/server/media.ts`, with yt-dlp moved to its stable channel. See SECURITY.md.
-- **No cap on simultaneous streams**, beyond one per voice channel.
 
 ## Bug log
 

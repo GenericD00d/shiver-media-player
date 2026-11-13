@@ -4,6 +4,16 @@ Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
 ## Unreleased
 
+### Added
+
+- A **Simultaneous streams** setting (default 3), and a limit of 6 videos a minute per member.
+
+### Security
+
+- Titles from the linked sites lose invisible and direction-changing marks before viewers see them.
+- `scripts/setup.ts` builds against Sharkord's v0.0.30 release and a pinned builder, not whatever
+  their main branches hold.
+
 ### Changed
 
 - The docs follow the Shiver standard ([docs/standards.md](docs/standards.md)): AGENTS.md,

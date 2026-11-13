@@ -33,6 +33,9 @@ What each step trusts, and what guards it, is in [SECURITY.md](SECURITY.md#trust
 src/server/index.ts       entry: settings, actions, the update command, sessions
 src/server/media.ts       binaries, yt-dlp, probing, ffmpeg's command line
 src/server/proxy.ts       the proxy setting, and the HTTP bridge for SOCKS proxies
+src/server/limits.ts      the cap on simultaneous streams, and the per-member play rate
+src/server/text.ts        titles cleaned of invisible and direction-changing marks
+src/server/addresses.ts   isPrivateAddress, ported from Shiver's companion plugin
 src/server/*.test.ts      unit tests (bun test)
 src/client/index.ts       the slots: VOICE_CONTROLS and TOPBAR_RIGHT
 src/client/player.tsx     the button and the panel with the controls
@@ -63,6 +66,10 @@ manifest.json             the plugin's id, version and SDK version
 - **`src/server/proxy.ts`**: `PROXY_URL` checks the setting. `ffmpegProxy` hands an http proxy to
   ffmpeg as-is, and for a SOCKS proxy starts a small HTTP bridge on `127.0.0.1` that tunnels through
   it, since ffmpeg can't speak SOCKS.
+- **`src/server/limits.ts`**: `canStartStream` (replacing a channel's own video adds no stream) and
+  `createRateLimiter`, which `play` uses for 6 videos a minute per member.
+- **`src/server/text.ts`**: `cleanTitle`, for the titles yt-dlp reports.
+- **`src/server/addresses.ts`**: `isPrivateAddress`, global unicast only.
 - **`src/client/player.tsx`**: `PlayerButton` (beside the camera and screen-share buttons) and
   `TopbarPlayerButton` (beside the call buttons) open `PlayerPanel`, with its link box and controls.
   `usePlayer` follows the pushed state for the channel.
@@ -71,8 +78,9 @@ manifest.json             the plugin's id, version and SDK version
 
 ### Playing a link
 
-1. `play` checks the caller is in a voice channel and the link is a full http(s) URL, then ends any
-   session already in that channel.
+1. `play` checks the caller is in a voice channel, the link is a full http(s) URL, the server isn't
+   already streaming in as many channels as **Simultaneous streams** allows, and the member hasn't
+   started too many videos this minute. It then ends any session already in that channel.
 2. `resolveMedia` runs yt-dlp on the link, with the link after `--`. It picks formats up to the
    max height setting, H.264 first.
 3. For a direct link whose tracks or length yt-dlp doesn't know, `probe` asks ffmpeg.
@@ -91,7 +99,7 @@ the way that worked is remembered.
 - **Actions and the pushed state**: `TSharkord` in `src/contract.ts`. `getState`, `play`, `pause`,
   `resume`, `seek` and `stop` each answer with the channel's `TPlayerState`.
 - **The command** `/shiver-update-yt-dlp`, which needs `MANAGE_PLUGINS`.
-- **Settings**: `maxHeight` (144 to 1080), `videoBitrate` (such as `2500k`), `proxy`.
+- **Settings**: `maxHeight` (144 to 1080), `videoBitrate` (such as `2500k`), `proxy`, `maxStreams`.
 - **Files**: `<data-dir>/plugin-data/shiver-media-player/bin/` holds the binaries and an optional
   `cookies.txt`.
 - **Releases**: `shiver-media-player-<version>.tar.gz` and `<version>.json`, plugin id
