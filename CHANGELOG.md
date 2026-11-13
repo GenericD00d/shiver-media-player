@@ -10,6 +10,11 @@ Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
 ### Security
 
+- Links can no longer make the server reach its own network. Every request yt-dlp and ffmpeg make,
+  redirects, playlists and segments included, goes through a guard that refuses loopback, private,
+  link-local and other non-public addresses, and connects only to the address it checked. A refused
+  link stops with a message saying so. With a proxy set, the guard looks names up itself and hands
+  the proxy the address, so `socks5h://` now behaves like `socks5://`.
 - Titles from the linked sites lose invisible and direction-changing marks before viewers see them.
 - `scripts/setup.ts` builds against Sharkord's v0.0.30 release and a pinned builder, not whatever
   their main branches hold.
