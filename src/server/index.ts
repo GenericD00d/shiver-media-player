@@ -20,6 +20,7 @@ import {
   VIDEO_PT,
   type TMedia,
 } from "./media";
+import { canStartStream, createRateLimiter } from "./limits";
 import { ffmpegProxy, PROXY_URL, stopBridge } from "./proxy";
 
 type TCtx = PluginContext<TSharkord>;
@@ -67,7 +68,10 @@ const sessions = new Map<number, TSession>();
  */
 let useFallback = false;
 let ctx: TCtx | null = null;
-let settings: { maxHeight: () => number; videoBitrate: () => string; proxy: () => string } | null = null;
+let settings: { maxHeight: () => number; videoBitrate: () => string; proxy: () => string; maxStreams: () => number } | null = null;
+
+// each play costs a resolve and a fresh encode, so one member can't start them back to back
+const playAllowed = createRateLimiter(6, 60_000);
 
 const positionOf = (s: TSession): number => {
   const p = s.offsetSec + (s.playingSince ? (Date.now() - s.playingSince) / 1000 : 0);
@@ -347,6 +351,14 @@ const onLoad = async (c: TCtx) => {
       type: "string",
       defaultValue: "",
     },
+    {
+      key: "maxStreams",
+      name: "Simultaneous streams",
+      description:
+        "How many voice channels can play at once across the server. Each one costs a real-time encode of CPU and upload per viewer.",
+      type: "number",
+      defaultValue: 3,
+    },
   ] as const);
 
   settings = {
@@ -360,6 +372,7 @@ const onLoad = async (c: TCtx) => {
 
       return p;
     },
+    maxStreams: () => Math.max(1, s.get("maxStreams") || 3),
   };
 
   c.ui.enable({
@@ -394,6 +407,12 @@ const onLoad = async (c: TCtx) => {
 
       if (!/^https?:\/\/\S+$/i.test(trimmed) || trimmed.length > 2048) {
         throw new Error("Paste a full http(s) link.");
+      }
+      if (!canStartStream(sessions.keys(), channelId, settings!.maxStreams())) {
+        throw new Error(`Videos are already playing in ${settings!.maxStreams()} channels. Stop one first.`);
+      }
+      if (!playAllowed(invoker.userId)) {
+        throw new Error("That's a lot of videos in a row. Try again in a minute.");
       }
 
       endSession(channelId);

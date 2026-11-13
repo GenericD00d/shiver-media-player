@@ -1,9 +1,14 @@
 import { $ } from "bun";
 import fs from "fs";
 
-const repos: [string, string[]][] = [
-  ["sharkord", ["packages/plugin-sdk", "packages/ui"]],
-  ["plugin-builder", ["."]],
+// Pinned, so a build uses the SDK the Shiver family is tested against rather than whatever is on
+// Sharkord's main branch that day. Move them together with SHARKORD_REF in Shiver's
+// scripts/check-sharkord.py (docs/standards.md, "Contracts between the repos").
+const repos: [name: string, ref: string, packages: string[]][] = [
+  // Sharkord's v0.0.30 release
+  ["sharkord", "230a74b4034b6d6d35b28ab28c6678cb37a24d01", ["packages/plugin-sdk", "packages/ui"]],
+  // the builder has no releases: the commit last built with
+  ["plugin-builder", "01ecf2936298aeffdc0af368b741e39e091149d4", ["."]],
 ];
 
 const links = [
@@ -12,25 +17,27 @@ const links = [
   "@sharkord/plugin-builder",
 ];
 
-for (const [name, packages] of repos) {
+for (const [name, ref, packages] of repos) {
   const dir = `.repos/${name}`;
 
-  if (fs.existsSync(dir)) {
-    console.log(`Updating ${name}...`);
-    await $`git -C ${dir} fetch --depth 1 origin`;
-    await $`git -C ${dir} reset --hard FETCH_HEAD`;
-  } else {
+  if (!fs.existsSync(dir)) {
     console.log(`Cloning ${name}...`);
-    await $`git clone --depth 1 https://github.com/Sharkord/${name}.git ${dir}`;
+    await $`git init -q ${dir}`;
+    await $`git -C ${dir} remote add origin https://github.com/Sharkord/${name}.git`;
   }
 
+  console.log(`Checking out ${name} at ${ref.slice(0, 12)}...`);
+  await $`git -C ${dir} fetch -q --depth 1 origin ${ref}`;
+  await $`git -C ${dir} checkout -q --force --detach FETCH_HEAD`;
+
+  // from the pinned commit's own lockfile, so its dependencies are pinned too.
   // --ignore-scripts: sharkord trusts mediasoup, whose install step compiles a
   // native worker from source on every core. Plugins only need its types.
-  await $`bun install --ignore-scripts`.cwd(dir);
+  await $`bun install --frozen-lockfile --ignore-scripts`.cwd(dir);
   for (const pkg of packages) await $`bun link`.cwd(`${dir}/${pkg}`);
 }
 
-await $`bun install`;
+await $`bun install --frozen-lockfile`;
 await $`bun link ${links}`;
 
 console.log(

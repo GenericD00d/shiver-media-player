@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { ffmpegProxy } from "./proxy";
+import { cleanTitle } from "./text";
 
 type TLogger = { log: (...m: unknown[]) => void; error: (...m: unknown[]) => void };
 
@@ -183,7 +184,8 @@ const parseYtDlpInfo = (info: TYtInfo, sourceUrl: string): TMedia => {
   const duration = info.duration;
 
   return {
-    title: info.title?.trim() || sourceUrl,
+    // shown to every viewer, so cleaned of marks that could make it read as something else
+    title: cleanTitle(info.title) || sourceUrl,
     thumbnailUrl: info.thumbnail && HTTP_URL.test(info.thumbnail) ? info.thumbnail : null,
     durationSec: !info.is_live && typeof duration === "number" && duration > 0 ? duration : null,
     video,

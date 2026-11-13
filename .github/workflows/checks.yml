@@ -1,0 +1,36 @@
+# Checks only: releases are published from one machine (RELEASING.md). Nothing here needs a
+# secret, so it is safe to run on pull requests from anyone. Actions are pinned to commit SHAs
+# (version in the comment) and Bun to an exact version.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Docs, versions, tests, audit and types
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.4.0
+      - name: Docs follow the Shiver standard
+        run: python3 scripts/check-docs.py
+      - name: Versions agree
+        run: python3 scripts/check-version.py
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - name: Dependency audit
+        run: bun audit
+      - name: Sharkord's SDK, at the release the family is tested against
+        run: bun run setup
+      - name: Types
+        run: scripts/check-types.sh
