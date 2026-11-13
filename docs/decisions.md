@@ -64,3 +64,9 @@ Fixed in 0.0.4.
 
 A link is resolved again once, then without the JS challenge, and the way that worked is
 remembered (0.0.5 and 0.0.6).
+
+### The proxy test failed wherever NO_PROXY covered localhost (fixed)
+
+It sent its request with `fetch`, which goes around a proxy for hosts in `NO_PROXY`, so it failed
+on machines whose `NO_PROXY` covers localhost. It now writes the request to the bridge by hand, the
+way ffmpeg does.

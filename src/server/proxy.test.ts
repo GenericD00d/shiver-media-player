@@ -35,6 +35,28 @@ socks.listen(0, "127.0.0.1");
 
 const web = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: (req) => new Response(`hi ${new URL(req.url).pathname}`) });
 
+/**
+ * One plain-http request through an http proxy, the way ffmpeg sends it: the absolute URL, to the
+ * proxy itself. Written out by hand because fetch goes around a proxy wherever NO_PROXY covers
+ * the host, which would make this test pass or fail with the machine it runs on.
+ */
+function getThroughProxy(proxy: string, url: string): Promise<string> {
+  const { hostname, port } = new URL(proxy);
+  const { host } = new URL(url);
+
+  return new Promise((resolve, reject) => {
+    let response = "";
+    const socket = net.connect(Number(port), hostname, () => {
+      socket.write(`GET ${url} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`);
+    });
+
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk) => (response += chunk));
+    socket.on("end", () => resolve(response));
+    socket.on("error", reject);
+  });
+}
+
 afterAll(() => {
   stopBridge();
   socks.close();
@@ -57,9 +79,9 @@ test("a socks proxy gets an http bridge that tunnels through it", async () => {
 
   expect(bridge).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
 
-  // absolute-url request, the way ffmpeg sends plain http through a proxy
-  const res = await fetch(`http://localhost:${web.port}/video.mp4`, { proxy: bridge });
+  const response = await getThroughProxy(bridge!, `http://localhost:${web.port}/video.mp4`);
 
-  expect(await res.text()).toBe("hi /video.mp4");
+  expect(response.startsWith("HTTP/1.1 200")).toBe(true);
+  expect(response.endsWith("hi /video.mp4")).toBe(true);
   expect(targets).toEqual([`localhost:${web.port}`]);
 });
