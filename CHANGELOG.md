@@ -10,6 +10,11 @@ Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
 ### Security
 
+- Links can no longer make the server reach its own network. Every request yt-dlp and ffmpeg make,
+  redirects, playlists and segments included, goes through a guard that refuses loopback, private,
+  link-local and other non-public addresses, and connects only to the address it checked. A refused
+  link stops with a message saying so. With a proxy set, the guard looks names up itself and hands
+  the proxy the address, so `socks5h://` now behaves like `socks5://`.
 - yt-dlp and ffmpeg are downloaded from fixed releases and checked against their SHA-256 before they
   run; a file that doesn't match is refused. yt-dlp now comes from its stable releases (2026.10.26)
   rather than nightly builds, and `/shiver-update-yt-dlp` takes the latest stable one only when it
@@ -20,6 +25,7 @@ Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
 ### Changed
 
+- `bun audit` runs weekly as well as on every push, in its own workflow (`.github/workflows/audit.yml`), so a new advisory shows up even when nothing is pushed.
 - The docs follow the Shiver standard ([docs/standards.md](docs/standards.md)): AGENTS.md,
   ARCHITECTURE.md, SECURITY.md, RELEASING.md and docs/decisions.md are new. CI checks the docs, the
   versions, the tests, the dependencies and the types.

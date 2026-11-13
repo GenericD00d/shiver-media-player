@@ -32,7 +32,7 @@ What each step trusts, and what guards it, is in [SECURITY.md](SECURITY.md#trust
 ```
 src/server/index.ts       entry: settings, actions, the update command, sessions
 src/server/media.ts       binaries, yt-dlp, probing, ffmpeg's command line
-src/server/proxy.ts       the proxy setting, and the HTTP bridge for SOCKS proxies
+src/server/proxy.ts       the guard every request goes through, and the proxy setting
 src/server/limits.ts      the cap on simultaneous streams, and the per-member play rate
 src/server/text.ts        titles cleaned of invisible and direction-changing marks
 src/server/addresses.ts   isPrivateAddress, ported from Shiver's companion plugin
@@ -64,9 +64,10 @@ manifest.json             the plugin's id, version and SDK version
     direct link;
   - ffmpeg: `sourceArgs`, `inputArgs` and `buildFfmpegArgs` build its command line, reading http(s)
     only and writing RTP to the transports.
-- **`src/server/proxy.ts`**: `PROXY_URL` checks the setting. `ffmpegProxy` hands an http proxy to
-  ffmpeg as-is, and for a SOCKS proxy starts a small HTTP bridge on `127.0.0.1` that tunnels through
-  it, since ffmpeg can't speak SOCKS.
+- **`src/server/proxy.ts`**: `PROXY_URL` checks the setting. `startGuard` runs the guard, an HTTP
+  proxy on `127.0.0.1` with a password made on each load, which every yt-dlp and ffmpeg run uses.
+  It checks each request's address (`checkedAddress`) and connects to it directly, or through the
+  admin's proxy with `httpConnect` or `socksConnect`, which also covers ffmpeg not speaking SOCKS.
 - **`src/server/limits.ts`**: `canStartStream` (replacing a channel's own video adds no stream) and
   `createRateLimiter`, which `play` uses for 6 videos a minute per member.
 - **`src/server/text.ts`**: `cleanTitle`, for the titles yt-dlp reports.

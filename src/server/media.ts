@@ -1,7 +1,6 @@
 import { createHash } from "crypto";
 import fs from "fs/promises";
 import path from "path";
-import { ffmpegProxy } from "./proxy";
 import { cleanTitle } from "./text";
 
 type TLogger = { log: (...m: unknown[]) => void; error: (...m: unknown[]) => void };
@@ -241,35 +240,47 @@ const parseYtDlpInfo = (info: TYtInfo, sourceUrl: string): TMedia => {
 
 const RESOLVE_TIMEOUT_MS = 45_000;
 
-const resolveMedia = async (
-  sourceUrl: string,
-  opts: { maxHeight: number; proxy: string; logger: TLogger; fallback?: boolean },
-): Promise<TMedia> => {
+type TResolveOptions = {
+  maxHeight: number;
+  /** the guard's url (proxy.ts): every request yt-dlp and ffmpeg make goes through it */
+  guard: string;
+  logger: TLogger;
+  fallback?: boolean;
+};
+
+/** yt-dlp's arguments. Pure, so a test can check the guard is always there. */
+const ytDlpArgs = (sourceUrl: string, opts: Omit<TResolveOptions, "logger"> & { cookies?: string }): string[] => {
+  const h = opts.maxHeight;
+
+  return [
+    "--dump-single-json",
+    "--no-playlist",
+    "--socket-timeout",
+    "15",
+    // YouTube's JS challenge unlocks its TV client. Some servers get 403s on that
+    // client's links, so the fallback skips the challenge and gets another client.
+    ...(opts.fallback ? ["--no-js-runtimes", "--no-cache-dir"] : ["--js-runtimes", "bun"]),
+    // h264/aac first: cheapest to decode, and the most widely supported
+    "-f",
+    `bv*[height<=${h}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${h}]+ba/b[height<=${h}]/bv*+ba/b`,
+    ...(opts.cookies ? ["--cookies", opts.cookies] : []),
+    // always: the guard keeps yt-dlp off the server's own network
+    "--proxy",
+    opts.guard,
+    // ends option parsing, so a url can never be read as a flag
+    "--",
+    sourceUrl,
+  ];
+};
+
+const resolveMedia = async (sourceUrl: string, opts: TResolveOptions): Promise<TMedia> => {
   if (!HTTP_URL.test(sourceUrl)) throw new Error("Paste an http(s) link.");
 
   const ytDlp = await getBinary("yt-dlp", opts.logger);
   const cookies = path.join(binDir, "cookies.txt");
-  const h = opts.maxHeight;
 
   const proc = Bun.spawn(
-    [
-      ytDlp,
-      "--dump-single-json",
-      "--no-playlist",
-      "--socket-timeout",
-      "15",
-      // YouTube's JS challenge unlocks its TV client. Some servers get 403s on that
-      // client's links, so the fallback skips the challenge and gets another client.
-      ...(opts.fallback ? ["--no-js-runtimes", "--no-cache-dir"] : ["--js-runtimes", "bun"]),
-      // h264/aac first: cheapest to decode, and the most widely supported
-      "-f",
-      `bv*[height<=${h}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${h}]+ba/b[height<=${h}]/bv*+ba/b`,
-      ...((await fs.exists(cookies)) ? ["--cookies", cookies] : []),
-      ...(opts.proxy ? ["--proxy", opts.proxy] : []),
-      // ends option parsing, so a url can never be read as a flag
-      "--",
-      sourceUrl,
-    ],
+    [ytDlp, ...ytDlpArgs(sourceUrl, { ...opts, cookies: (await fs.exists(cookies)) ? cookies : undefined })],
     { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
   );
 
@@ -303,7 +314,7 @@ const resolveMedia = async (
 
     if (!info.requested_formats?.length && (unknownTracks || unknownLength)) {
       const input = media.video ?? media.audio!;
-      const probed = parseProbe(await probe(await getBinary("ffmpeg", opts.logger), input, await ffmpegProxy(opts.proxy)));
+      const probed = parseProbe(await probe(await getBinary("ffmpeg", opts.logger), input, opts.guard));
 
       if (!probed.video && !probed.audio) throw new Error("No playable video or audio was found at that link.");
 
@@ -319,8 +330,8 @@ const resolveMedia = async (
 };
 
 /** `ffmpeg -i` with no output prints the streams and exits, which is all a probe needs */
-const probe = async (ffmpeg: string, input: TInput, httpProxy?: string): Promise<string> => {
-  const proc = Bun.spawn([ffmpeg, "-hide_banner", ...sourceArgs(input, httpProxy), "-i", input.url], {
+const probe = async (ffmpeg: string, input: TInput, guard: string): Promise<string> => {
+  const proc = Bun.spawn([ffmpeg, "-hide_banner", ...sourceArgs(input, guard), "-i", input.url], {
     stdin: "ignore",
     stdout: "ignore",
     stderr: "pipe",
@@ -359,8 +370,8 @@ type TFfmpegOptions = {
   startSec: number;
   maxHeight: number;
   videoBitrate: string;
-  /** an http:// proxy for every fetch, see ffmpegProxy */
-  httpProxy?: string;
+  /** the guard's url (proxy.ts), which every fetch goes through */
+  guard: string;
   rtpHost: string;
   videoPort: number;
   audioPort: number;
@@ -369,7 +380,7 @@ type TFfmpegOptions = {
 };
 
 /** how ffmpeg opens a resolved url: http(s) only, with the site's headers */
-const sourceArgs = (input: TInput, httpProxy?: string): string[] => {
+const sourceArgs = (input: TInput, guard: string): string[] => {
   const headers = Object.entries(input.headers)
     .map(([k, v]) => `${k}: ${v}\r\n`)
     .join("");
@@ -384,14 +395,16 @@ const sourceArgs = (input: TInput, httpProxy?: string): string[] => {
     "-reconnect_delay_max",
     "5",
     ...(headers ? ["-headers", headers] : []),
-    // YouTube's media urls only work from the IP that resolved them, so ffmpeg goes through the proxy too
-    ...(httpProxy ? ["-http_proxy", httpProxy] : []),
+    // always: the guard keeps ffmpeg off the server's own network, and goes on through the admin's
+    // proxy, since YouTube's media urls only work from the IP that resolved them
+    "-http_proxy",
+    guard,
   ];
 };
 
-const inputArgs = (input: TInput, startSec: number, httpProxy?: string): string[] => {
+const inputArgs = (input: TInput, startSec: number, guard: string): string[] => {
   return [
-    ...sourceArgs(input, httpProxy),
+    ...sourceArgs(input, guard),
     // before -i: seeks the input instead of decoding up to the position
     ...(startSec > 0 ? ["-ss", startSec.toFixed(2)] : []),
     // paced to realtime, since this is a live stream to the viewers
@@ -424,12 +437,12 @@ const buildFfmpegArgs = (o: TFfmpegOptions): string[] => {
   const generated = (graph: string) =>
     add([...(remaining ? ["-t", remaining.toFixed(2)] : []), "-re", "-f", "lavfi", "-i", graph]);
 
-  const v = media.video ? add(inputArgs(media.video, o.startSec, o.httpProxy)) : generated("color=c=black:s=640x360:r=25");
+  const v = media.video ? add(inputArgs(media.video, o.startSec, o.guard)) : generated("color=c=black:s=640x360:r=25");
   const a =
     media.audio && media.audio === media.video
       ? v
       : media.audio
-        ? add(inputArgs(media.audio, o.startSec, o.httpProxy))
+        ? add(inputArgs(media.audio, o.startSec, o.guard))
         : generated("anullsrc=r=48000:cl=stereo");
 
   const h = Math.min(1080, Math.max(144, Math.round(o.maxHeight)));
@@ -509,5 +522,6 @@ export {
   setBinDir,
   updateYtDlp,
   VIDEO_PT,
+  ytDlpArgs,
 };
 export type { TMedia };

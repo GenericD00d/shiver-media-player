@@ -33,7 +33,7 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
 |---|---|---|
 | Links members paste | The `play` action | Full http(s) URLs only, passed to yt-dlp after `--`; only members with the plugin's voice permission can play |
 | The pages and media those links lead to | yt-dlp and ffmpeg | ffmpeg reads http and https only; resolved media URLs must be http(s); timeouts on resolving and probing |
-| Where those requests go | The server's network | Not limited yet: see [Design decisions](#design-decisions-worth-knowing) |
+| Where those requests go | The server's network | Every request goes through the guard (`src/server/proxy.ts`), which resolves each name once, refuses it unless every address is public, and connects only to the address it checked; it wants a password made on each load |
 | The binaries it downloads | First load, and `/shiver-update-yt-dlp` | Pinned to a release and a SHA-256 each, checked before anything is written or run; an update must match its release's `SHA2-256SUMS` |
 | Members controlling playback | The actions | `JOIN_VOICE_CHANNELS`, which the owner can narrow per role; the update command needs `MANAGE_PLUGINS`; a server-wide cap on simultaneous streams and a per-member rate on plays |
 | Titles the linked sites report | The player, for every viewer | Invisible and direction-changing marks dropped, controls turned into spaces, capped |
@@ -41,7 +41,8 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
 ## In scope
 
 - **A link that makes the server read a local file**, or reach anything other than http(s).
-- **A link that makes the server reach addresses on its own network**, once that is refused.
+- **A link that makes the server reach addresses on its own network**, by any route: redirects,
+  playlists, manifests, segments or DNS.
 - **Running a binary the plugin didn't mean to**, or one that was changed on the way.
 - **Command or option injection** into yt-dlp or ffmpeg.
 - **A member controlling another channel's playback**, or acting without the permission.
@@ -58,11 +59,13 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
   connections never reach the linked site.
 - **ffmpeg is limited to http and https** (`-protocol_whitelist`), so no link or page can make it
   read a file on the server.
-- **Requests aren't limited to public addresses yet.** A link, or a playlist it leads to, can make
-  the server fetch an address on its own network. The check for it is in place and tested
-  (`src/server/addresses.ts`); applying it to every connection is an open item in
-  [docs/decisions.md](docs/decisions.md#open-items). Until then, the Permissions section of the
-  README applies: grant playback only to members you trust with the server's network.
+- **Every request goes through one guard.** yt-dlp gets `--proxy` and ffmpeg `-http_proxy`, always,
+  pointing at an HTTP proxy the plugin runs on `127.0.0.1` from load. It takes CONNECT and
+  absolute-URL requests only, resolves each name once, refuses the request unless every address is
+  global unicast (`isPrivateAddress`), and connects to the address it checked, so a second lookup
+  can't answer differently. With the admin's proxy set, it goes on through that proxy to the
+  checked address. It wants a password made on each load, so other programs on the server can't
+  use it as a way in. If it can't start, playback fails rather than run without it.
 - **The binaries are pinned.** yt-dlp is a fixed stable release, its hashes taken from that
   release's own `SHA2-256SUMS`. ffmpeg is a fixed release of `diogomartino/plugin-binaries`, the
   builds Sharkord's own plugins use, which publishes no checksums: its hashes were taken from a
@@ -75,4 +78,4 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
 
 | Date | Review | Fixed in | What it found |
 |---|---|---|---|
-| 2026-11-13 | Review of the four Shiver repos, internal and LLM-assisted | The standards work; pinned binaries | Requests could reach the server's own network (check added, not yet applied); downloaded binaries weren't verified, and yt-dlp came from its nightly channel (open); no cap on streams (fixed); titles kept invisible marks (fixed) |
+| 2026-11-13 | Review of the four Shiver repos, internal and LLM-assisted | The standards work; the guard (requests to the server's network); pinned binaries | Requests could reach the server's own network (fixed: the guard); downloaded binaries weren't verified, and yt-dlp came from its nightly channel (fixed: pinned); no cap on streams (fixed); titles kept invisible marks (fixed) |

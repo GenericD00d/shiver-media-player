@@ -78,9 +78,12 @@ Playback stops by itself when the video ends or the last person leaves the chann
 - **Proxy** (optional, empty by default): fetches every video through a proxy,
   for when a site blocks the server's IP. Takes `http://host:port`,
   `socks5://host:port` or `socks5h://host:port`, optionally with `user:pass@`.
-  ffmpeg can't use SOCKS itself, so for SOCKS the plugin runs a small HTTP proxy
-  on `127.0.0.1` that forwards through it. An invalid value makes playback fail
-  instead of quietly bypassing the proxy.
+  Every request first goes through the plugin's own guard on `127.0.0.1`, which
+  looks up each name itself and hands the proxy only the address it checked, so
+  `socks5h://` no longer has the proxy resolve names: it behaves like
+  `socks5://`. An http proxy is asked to `CONNECT` to that address, plain http
+  too. An invalid value makes playback fail instead of quietly bypassing the
+  proxy.
 - **Simultaneous streams** (default 3): how many voice channels can play at once
   across the server. Each member can also start at most 6 videos a minute.
 
@@ -89,9 +92,14 @@ Playback stops by itself when the video ends or the last person leaves the chann
 The button and every control need `JOIN_VOICE_CHANNELS`, and the owner can
 narrow that per role in the plugin's permissions. `/shiver-update-yt-dlp` needs `MANAGE_PLUGINS`.
 
-The server fetches whatever link it is given, so only grant control to people
-you trust not to point it at your internal network. Resolved media is limited to
-http(s), so a link can never make ffmpeg read files on the server.
+The server fetches the link it is given, and everything that link leads to.
+Every one of those requests goes through the plugin's guard, which refuses
+loopback, private, link-local, cloud metadata and other non-public addresses,
+however the name resolves, so a link can't reach your internal network; playback
+then stops with "That link leads to an address on the server's own network".
+Resolved media is limited to http(s), so a link can never make ffmpeg read files
+on the server. Members who can play still choose what the server downloads, so
+grant playback to people you trust with its bandwidth.
 
 ## Known limitations
 

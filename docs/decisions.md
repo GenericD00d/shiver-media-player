@@ -44,6 +44,19 @@ as there are voice channels, one after another.
 videos a minute (`src/server/limits.ts`). Replacing what plays in your own channel doesn't count
 against the cap.
 
+## 2026-11-13: One guard for every request yt-dlp and ffmpeg make
+
+**Why:** a link, and every redirect, playlist, manifest and segment it leads to, could make the
+server reach its own network: loopback, private ranges, link-local and cloud metadata addresses.
+yt-dlp and ffmpeg follow those themselves, so the only place to check them all is the connection.
+
+**Consequences:** the SOCKS bridge became the guard (`startGuard` in `src/server/proxy.ts`), started
+on load and used by every run, probes included, whether or not a proxy is set. It resolves each
+name once, refuses it unless every address is public, and connects to the address it checked;
+an admin's proxy gets that address, so `socks5h://` no longer resolves names at the proxy. It wants
+a password made on each load. A refused request ends playback saying the address isn't allowed,
+and playback fails if the guard couldn't start.
+
 ## 2026-11-13: Pinned binaries, and yt-dlp from its stable releases
 
 **Why:** the plugin downloaded the latest yt-dlp nightly and the latest ffmpeg build and ran them
@@ -58,10 +71,7 @@ pins is in RELEASING.md. Checking yt-dlp's signature on `SHA2-256SUMS` is left f
 
 ## Open items
 
-- **Requests to the server's own network** aren't refused yet. The check is in place and tested
-  (`isPrivateAddress` in `src/server/addresses.ts`, ported from Shiver's companion plugin); what's
-  left is applying it to every connection yt-dlp and ffmpeg make, on the address actually
-  connected to, as the standard's code rule 1 asks. See SECURITY.md.
+None.
 
 ## Bug log
 

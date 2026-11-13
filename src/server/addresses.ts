@@ -99,4 +99,4 @@ const isPrivateAddress = (address: string): boolean => {
   return true;
 };
 
-export { isPrivateAddress };
+export { ipv6Groups, isPrivateAddress };

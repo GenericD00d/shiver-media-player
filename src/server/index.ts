@@ -21,7 +21,7 @@ import {
   type TMedia,
 } from "./media";
 import { canStartStream, createRateLimiter } from "./limits";
-import { ffmpegProxy, PROXY_URL, stopBridge } from "./proxy";
+import { PROXY_URL, startGuard, type TGuard } from "./proxy";
 
 type TCtx = PluginContext<TSharkord>;
 
@@ -68,6 +68,21 @@ const sessions = new Map<number, TSession>();
  */
 let useFallback = false;
 let ctx: TCtx | null = null;
+/** started on load; every yt-dlp and ffmpeg run goes through it (proxy.ts) */
+let guard: Promise<TGuard> | null = null;
+
+const REFUSED = "That link leads to an address on the server's own network, which isn't allowed.";
+
+/** The guard's url, or a clear failure when it couldn't start: playback never runs without it. */
+const guardUrl = async (): Promise<TGuard> => {
+  settings!.proxy(); // an invalid proxy setting fails here, as before
+
+  try {
+    return await guard!;
+  } catch {
+    throw new Error("Playback is unavailable: the plugin's network guard didn't start. See the plugin logs.");
+  }
+};
 let settings: { maxHeight: () => number; videoBitrate: () => string; proxy: () => string; maxStreams: () => number } | null = null;
 
 // each play costs a resolve and a fresh encode, so one member can't start them back to back
@@ -148,13 +163,23 @@ const startAt = async (s: TSession, sec: number) => {
   s.offsetSec = sec;
   publish(s.channelId);
 
+  const g = await guardUrl();
+
   if (!s.media || Date.now() - s.resolvedAt > RESOLVE_TTL_MS) {
-    s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), proxy: settings!.proxy(), logger, fallback: useFallback !== s.retried });
+    const before = g.refusals();
+
+    try {
+      s.media = await resolveMedia(s.url, { maxHeight: settings!.maxHeight(), guard: g.url, logger, fallback: useFallback !== s.retried });
+    } catch (err) {
+      // ponytail: refusals are counted across channels, so one refused at the same moment
+      // elsewhere can name the wrong cause; a per-run login would make it exact
+      throw g.refusals() > before ? new Error(REFUSED) : err;
+    }
+
     s.resolvedAt = Date.now();
   }
 
   const ffmpeg = await getBinary("ffmpeg", logger);
-  const httpProxy = await ffmpegProxy(settings!.proxy());
 
   if (s.closed) return;
 
@@ -238,7 +263,7 @@ const startAt = async (s: TSession, sec: number) => {
         startSec: sec,
         maxHeight: settings!.maxHeight(),
         videoBitrate: settings!.videoBitrate(),
-        httpProxy,
+        guard: g.url,
         rtpHost: ip,
         videoPort: vt.tuple.localPort,
         audioPort: at.tuple.localPort,
@@ -251,6 +276,7 @@ const startAt = async (s: TSession, sec: number) => {
 
   // read as it comes, so a chatty ffmpeg never blocks on a full pipe
   const stderr = new Response(proc.stderr).text();
+  const refusedBefore = g.refusals();
 
   s.proc = proc;
 
@@ -288,6 +314,7 @@ const startAt = async (s: TSession, sec: number) => {
     }
 
     if (code === 0) logger.log(`Finished "${s.media?.title}" in channel ${s.channelId}`);
+    else if (g.refusals() > refusedBefore) logger.error(`Stopped in channel ${s.channelId}: ${REFUSED}`, log);
     else logger.error(`ffmpeg exited with code ${code} in channel ${s.channelId}`, log);
 
     endSession(s.channelId);
@@ -374,6 +401,9 @@ const onLoad = async (c: TCtx) => {
     },
     maxStreams: () => Math.max(1, s.get("maxStreams") || 3),
   };
+
+  guard = startGuard({ upstream: () => settings!.proxy() });
+  guard.catch((err) => c.logger.error("The network guard didn't start:", String(err)));
 
   c.ui.enable({
     [PluginSlot.VOICE_CONTROLS]: Permission.JOIN_VOICE_CHANNELS,
@@ -532,7 +562,8 @@ const onLoad = async (c: TCtx) => {
 
 const onUnload = () => {
   for (const channelId of [...sessions.keys()]) endSession(channelId);
-  stopBridge();
+  guard?.then((g) => g.close()).catch(() => {});
+  guard = null;
 
   ctx = null;
 };

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { buildFfmpegArgs, parseProbe, parseYtDlpInfo } from "./media";
 
-const base = { maxHeight: 720, videoBitrate: "2500k", rtpHost: "127.0.0.1", videoPort: 1000, audioPort: 2000, videoSsrc: 1, audioSsrc: 2 };
+const base = { maxHeight: 720, videoBitrate: "2500k", guard: "http://shiver:x@127.0.0.1:1", rtpHost: "127.0.0.1", videoPort: 1000, audioPort: 2000, videoSsrc: 1, audioSsrc: 2 };
 
 test("separate youtube-style streams become two inputs, mapped apart", () => {
   const media = parseYtDlpInfo(
