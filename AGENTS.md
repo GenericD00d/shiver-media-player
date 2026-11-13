@@ -48,7 +48,7 @@ Releases are in [RELEASING.md](RELEASING.md).
 ```
 src/server/index.ts   the plugin's entry: settings, actions, the command, one session per channel
 src/server/media.ts   the binaries, yt-dlp resolving, ffmpeg's command line
-src/server/proxy.ts   the proxy setting, and the HTTP bridge ffmpeg uses for SOCKS proxies
+src/server/proxy.ts   the guard every yt-dlp and ffmpeg request goes through, and the proxy setting
 src/server/limits.ts  the caps on streams and plays; text.ts cleans titles; addresses.ts public-only checks
 src/client/           the button and controls (player.tsx), and the slots they go in (index.ts)
 src/contract.ts       the types both halves share
@@ -71,6 +71,7 @@ SECURITY.md explains why each one matters.
 | No more than the set number of channels stream at once, and a member can start only so many videos a minute | `play` in `src/server/index.ts`, `src/server/limits.ts` | `src/server/limits.test.ts` |
 | Titles shown to viewers lose invisible and direction-changing marks | `parseYtDlpInfo`, `src/server/text.ts` | `src/server/text.test.ts` |
 | Addresses on the server's own network are refused by `isPrivateAddress`, which keeps the companion plugin's test vectors | `src/server/addresses.ts` | `src/server/addresses.test.ts` |
+| Every request yt-dlp and ffmpeg make goes through the guard, which connects only to public addresses | `startGuard` in `src/server/proxy.ts`; `ytDlpArgs` and `sourceArgs` in `src/server/media.ts`; `startAt` in `src/server/index.ts` | `src/server/proxy.test.ts` |
 
 ## Conventions
 
