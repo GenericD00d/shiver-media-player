@@ -57,11 +57,21 @@ an admin's proxy gets that address, so `socks5h://` no longer resolves names at 
 a password made on each load. A refused request ends playback saying the address isn't allowed,
 and playback fails if the guard couldn't start.
 
+## 2026-11-13: Pinned binaries, and yt-dlp from its stable releases
+
+**Why:** the plugin downloaded the latest yt-dlp nightly and the latest ffmpeg build and ran them
+unchecked, so whoever could change those release pages decided what the server ran. Decision D6 of
+the family review had already agreed a pinned stable yt-dlp.
+
+**Consequences:** `DOWNLOADS` pins yt-dlp 2026.10.26 and plugin-binaries 0.0.1, with a SHA-256 for
+each platform, checked before a download is written. yt-dlp's hashes are from its `SHA2-256SUMS`;
+ffmpeg's are trust on first use, since its releases publish none. `/shiver-update-yt-dlp` takes
+the latest stable yt-dlp only when that release's `SHA2-256SUMS` has a matching line. Bumping the
+pins is in RELEASING.md. Checking yt-dlp's signature on `SHA2-256SUMS` is left for later.
+
 ## Open items
 
-- **The downloaded binaries** aren't pinned or verified yet, and yt-dlp comes from its nightly
-  channel. Pinning needs each release's SHA-256 per platform, written into `DOWNLOADS` in
-  `src/server/media.ts`, with yt-dlp moved to its stable channel. See SECURITY.md.
+None.
 
 ## Bug log
 

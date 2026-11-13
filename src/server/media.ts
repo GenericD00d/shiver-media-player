@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { cleanTitle } from "./text";
@@ -24,21 +25,35 @@ const HTTP_URL = /^https?:\/\//i;
 
 const exe = (name: string) => (process.platform === "win32" ? `${name}.exe` : name);
 
-// the same builds Sharkord's own music-bot and iptv plugins download
-const DOWNLOADS: Record<string, Record<TBinary, string>> = {
+/** A download pinned to one release's file, checked against its SHA-256 before it is ever run. */
+type TPin = { url: string; sha256: string };
+
+/*
+ * Bumping a pin: RELEASING.md, "Bumping the binary pins". yt-dlp's hashes come from the release's
+ * own SHA2-256SUMS. plugin-binaries (the ffmpeg builds Sharkord's own music-bot and iptv plugins
+ * download) publishes no checksums, so its hashes are trust on first use: taken from a download
+ * on the day they were pinned (SECURITY.md).
+ */
+const YT_DLP = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/";
+const FFMPEG = "https://github.com/diogomartino/plugin-binaries/releases/download/0.0.1/";
+
+const DOWNLOADS: Record<string, Record<TBinary, TPin>> = {
   linux_x64: {
-    ffmpeg: "https://github.com/diogomartino/plugin-binaries/releases/latest/download/ffmpeg-linux-x64.tar.gz",
-    "yt-dlp": "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux",
+    ffmpeg: { url: `${FFMPEG}ffmpeg-linux-x64.tar.gz`, sha256: "da7f697fc9eaf4c878d4fc7d2dde589538b6856467aa81890afaab0a28114b42" },
+    "yt-dlp": { url: `${YT_DLP}yt-dlp_linux`, sha256: "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795" },
   },
   linux_arm64: {
-    ffmpeg: "https://github.com/diogomartino/plugin-binaries/releases/latest/download/ffmpeg-linux-arm64.tar.gz",
-    "yt-dlp": "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux_aarch64",
+    ffmpeg: { url: `${FFMPEG}ffmpeg-linux-arm64.tar.gz`, sha256: "4fc0b07bf69dbaf189eb6f952601a80c2eaa48556e27119a1c5d04defc79c827" },
+    "yt-dlp": { url: `${YT_DLP}yt-dlp_linux_aarch64`, sha256: "e87e9533e89fe5889abaa21f5114dfe7756d6aa6219b83551add04d48b18e483" },
   },
   win32_x64: {
-    ffmpeg: "https://github.com/diogomartino/plugin-binaries/releases/latest/download/ffmpeg-win64.tar.gz",
-    "yt-dlp": "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe",
+    ffmpeg: { url: `${FFMPEG}ffmpeg-win64.tar.gz`, sha256: "9099d52959ca4d62162551767856bd81c7dd881a29fa91e6d7ac9d955a6cd4c4" },
+    "yt-dlp": { url: `${YT_DLP}yt-dlp.exe`, sha256: "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d" },
   },
 };
+
+/** Where `/shiver-update-yt-dlp` looks: yt-dlp's latest stable release. */
+const YT_DLP_LATEST = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
 
 let binDir = "";
 const binaries = new Map<TBinary, Promise<string>>();
@@ -48,12 +63,12 @@ const setBinDir = (dir: string) => {
   binaries.clear();
 };
 
-const download = async (name: TBinary, logger: TLogger): Promise<string> => {
+const download = async (name: TBinary, logger: TLogger, pin?: TPin): Promise<string> => {
   const arch = `${process.platform}_${process.arch}`;
-  const url = DOWNLOADS[arch]?.[name];
+  const { url, sha256 } = pin ?? DOWNLOADS[arch]?.[name] ?? {};
   const target = path.join(binDir, exe(name));
 
-  if (!url) {
+  if (!url || !sha256) {
     throw new Error(`No ${name} download for ${arch}. Install it on the server's PATH or put it at ${target}.`);
   }
 
@@ -69,6 +84,13 @@ const download = async (name: TBinary, logger: TLogger): Promise<string> => {
     if (!res.ok) throw new Error(`Downloading ${name} failed: HTTP ${res.status}`);
 
     const bytes = new Uint8Array(await res.arrayBuffer());
+    const got = createHash("sha256").update(bytes).digest("hex");
+
+    // checked before anything is written, so a changed file is never unpacked, made executable or run
+    if (got !== sha256.toLowerCase()) {
+      throw new Error(`${name} from ${url} isn't the expected file (SHA-256 ${got}, expected ${sha256}). Nothing was installed.`);
+    }
+
     // written beside the target and renamed, so a failed download never replaces a working binary
     let staged = path.join(tmp, exe(name));
 
@@ -124,9 +146,33 @@ const getBinary = (name: TBinary, logger: TLogger): Promise<string> => {
   return found;
 };
 
-/** YouTube changes faster than yt-dlp releases, so admins need a way to pull a fresh one. */
-const updateYtDlp = (logger: TLogger) => {
-  const updated = download("yt-dlp", logger);
+/**
+ * The latest stable yt-dlp for this platform, pinned to the hash in that release's own SHA2-256SUMS.
+ * Without a line for the file there is nothing to check it against, so the update is refused.
+ */
+const latestYtDlpPin = async (base = YT_DLP_LATEST): Promise<TPin> => {
+  const pinned = DOWNLOADS[`${process.platform}_${process.arch}`]?.["yt-dlp"];
+
+  if (!pinned) throw new Error(`No yt-dlp download for ${process.platform}_${process.arch}.`);
+
+  const asset = path.posix.basename(pinned.url);
+  const res = await fetch(`${base}SHA2-256SUMS`);
+
+  if (!res.ok) throw new Error(`Fetching yt-dlp's SHA2-256SUMS failed: HTTP ${res.status}`);
+
+  const line = (await res.text()).split("\n").find((l) => l.trim().split(/\s+/)[1]?.replace(/^\*/, "") === asset);
+  const sha256 = line?.trim().split(/\s+/)[0];
+
+  if (!sha256 || !/^[0-9a-f]{64}$/i.test(sha256)) throw new Error(`yt-dlp's SHA2-256SUMS has no hash for ${asset}, so it wasn't updated.`);
+
+  // ponytail: "latest" is looked up twice, so a release published in between fails the hash and
+  // is refused; resolve the tag first if that ever bites
+  return { url: `${base}${asset}`, sha256 };
+};
+
+/** YouTube changes faster than the pinned yt-dlp, so admins need a way to pull a fresh, checked one. */
+const updateYtDlp = (logger: TLogger, base?: string) => {
+  const updated = latestYtDlpPin(base).then((pin) => download("yt-dlp", logger, pin));
 
   binaries.set("yt-dlp", updated);
   updated.catch(() => binaries.delete("yt-dlp"));
@@ -466,7 +512,9 @@ const buildFfmpegArgs = (o: TFfmpegOptions): string[] => {
 export {
   AUDIO_PT,
   buildFfmpegArgs,
+  download,
   getBinary,
+  latestYtDlpPin,
   H264_PROFILE_LEVEL_ID,
   parseProbe,
   parseYtDlpInfo,

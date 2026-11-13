@@ -72,6 +72,7 @@ SECURITY.md explains why each one matters.
 | Titles shown to viewers lose invisible and direction-changing marks | `parseYtDlpInfo`, `src/server/text.ts` | `src/server/text.test.ts` |
 | Addresses on the server's own network are refused by `isPrivateAddress`, which keeps the companion plugin's test vectors | `src/server/addresses.ts` | `src/server/addresses.test.ts` |
 | Every request yt-dlp and ffmpeg make goes through the guard, which connects only to public addresses | `startGuard` in `src/server/proxy.ts`; `ytDlpArgs` and `sourceArgs` in `src/server/media.ts`; `startAt` in `src/server/index.ts` | `src/server/proxy.test.ts` |
+| Downloaded binaries are pinned to a version and SHA-256, and checked before they run | `DOWNLOADS`, `download` and `latestYtDlpPin` in `src/server/media.ts` | `src/server/binaries.test.ts` |
 
 ## Conventions
 

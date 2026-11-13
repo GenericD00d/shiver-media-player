@@ -34,7 +34,7 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
 | Links members paste | The `play` action | Full http(s) URLs only, passed to yt-dlp after `--`; only members with the plugin's voice permission can play |
 | The pages and media those links lead to | yt-dlp and ffmpeg | ffmpeg reads http and https only; resolved media URLs must be http(s); timeouts on resolving and probing |
 | Where those requests go | The server's network | Every request goes through the guard (`src/server/proxy.ts`), which resolves each name once, refuses it unless every address is public, and connects only to the address it checked; it wants a password made on each load |
-| The binaries it downloads | First load, and `/shiver-update-yt-dlp` | Not verified yet: see [Design decisions](#design-decisions-worth-knowing) |
+| The binaries it downloads | First load, and `/shiver-update-yt-dlp` | Pinned to a release and a SHA-256 each, checked before anything is written or run; an update must match its release's `SHA2-256SUMS` |
 | Members controlling playback | The actions | `JOIN_VOICE_CHANNELS`, which the owner can narrow per role; the update command needs `MANAGE_PLUGINS`; a server-wide cap on simultaneous streams and a per-member rate on plays |
 | Titles the linked sites report | The player, for every viewer | Invisible and direction-changing marks dropped, controls turned into spaces, capped |
 
@@ -66,12 +66,16 @@ enforce each line, and their tests, are in [AGENTS.md](AGENTS.md#rules-that-must
   can't answer differently. With the admin's proxy set, it goes on through that proxy to the
   checked address. It wants a password made on each load, so other programs on the server can't
   use it as a way in. If it can't start, playback fails rather than run without it.
-- **The binaries aren't verified yet.** They come from GitHub over HTTPS, the same builds Sharkord's
-  own plugins download. Pinning each to a version and a SHA-256 is an open item in
-  [docs/decisions.md](docs/decisions.md#open-items).
+- **The binaries are pinned.** yt-dlp is a fixed stable release, its hashes taken from that
+  release's own `SHA2-256SUMS`. ffmpeg is a fixed release of `diogomartino/plugin-binaries`, the
+  builds Sharkord's own plugins use, which publishes no checksums: its hashes were taken from a
+  download when it was pinned, so that pin is trust on first use. A download that doesn't match is
+  refused before it is unpacked, made executable or run. `/shiver-update-yt-dlp` takes the latest
+  stable yt-dlp only with a matching line in that release's `SHA2-256SUMS`; its signature on that
+  file isn't checked yet. Binaries the admin places in `bin`, or on `PATH`, are the admin's.
 
 ## Review history
 
 | Date | Review | Fixed in | What it found |
 |---|---|---|---|
-| 2026-11-13 | Review of the four Shiver repos, internal and LLM-assisted | The standards work; the guard (requests to the server's network) | Requests could reach the server's own network (check added, not yet applied); downloaded binaries weren't verified, and yt-dlp came from its nightly channel (open); no cap on streams (fixed); titles kept invisible marks (fixed) |
+| 2026-11-13 | Review of the four Shiver repos, internal and LLM-assisted | The standards work; the guard (requests to the server's network); pinned binaries | Requests could reach the server's own network (fixed: the guard); downloaded binaries weren't verified, and yt-dlp came from its nightly channel (fixed: pinned); no cap on streams (fixed); titles kept invisible marks (fixed) |
