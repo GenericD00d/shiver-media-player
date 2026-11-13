@@ -37,9 +37,12 @@ temp-share plugin's.
 
 ## 2026-11-13: Caps on streams and plays
 
-**Why:** each stream is a real-time encode, so any member able to play could otherwise start as many as there are voice channels, one after another.
+**Why:** each stream is a real-time encode, so any member able to play could otherwise start as many
+as there are voice channels, one after another.
 
-**Consequences:** **Simultaneous streams** (default 3) caps the server, and each member can start 6 videos a minute (`src/server/limits.ts`). Replacing what plays in your own channel doesn't count against the cap.
+**Consequences:** **Simultaneous streams** (default 3) caps the server, and each member can start 6
+videos a minute (`src/server/limits.ts`). Replacing what plays in your own channel doesn't count
+against the cap.
 
 ## Open items
 
