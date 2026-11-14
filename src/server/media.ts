@@ -249,7 +249,10 @@ type TResolveOptions = {
 };
 
 /** yt-dlp's arguments. Pure, so a test can check the guard is always there. */
-const ytDlpArgs = (sourceUrl: string, opts: Omit<TResolveOptions, "logger"> & { cookies?: string }): string[] => {
+const ytDlpArgs = (
+  sourceUrl: string,
+  opts: Omit<TResolveOptions, "logger"> & { cookies?: string; jsRuntime?: string },
+): string[] => {
   const h = opts.maxHeight;
 
   return [
@@ -259,7 +262,12 @@ const ytDlpArgs = (sourceUrl: string, opts: Omit<TResolveOptions, "logger"> & { 
     "15",
     // YouTube's JS challenge unlocks its TV client. Some servers get 403s on that
     // client's links, so the fallback skips the challenge and gets another client.
-    ...(opts.fallback ? ["--no-js-runtimes", "--no-cache-dir"] : ["--js-runtimes", "bun"]),
+    //
+    // The challenge needs a JavaScript runtime, and a server rarely has `bun` on its PATH: Sharkord
+    // is one compiled Bun program. So yt-dlp is pointed at that program, which runs as plain `bun`
+    // with BUN_BE_BUN=1 (set where yt-dlp is started). Without it, yt-dlp finds no runtime, and
+    // YouTube's links play from the start but refuse the range requests a seek or resume makes.
+    ...(opts.fallback ? ["--no-js-runtimes", "--no-cache-dir"] : ["--js-runtimes", `bun:${opts.jsRuntime ?? process.execPath}`]),
     // h264/aac first: cheapest to decode, and the most widely supported
     "-f",
     `bv*[height<=${h}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${h}]+ba/b[height<=${h}]/bv*+ba/b`,
@@ -281,7 +289,8 @@ const resolveMedia = async (sourceUrl: string, opts: TResolveOptions): Promise<T
 
   const proc = Bun.spawn(
     [ytDlp, ...ytDlpArgs(sourceUrl, { ...opts, cookies: (await fs.exists(cookies)) ? cookies : undefined })],
-    { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+    // BUN_BE_BUN makes the Sharkord executable act as the `bun` CLI when yt-dlp runs it (see ytDlpArgs)
+    { stdin: "ignore", stdout: "pipe", stderr: "pipe", env: { ...process.env, BUN_BE_BUN: "1" } },
   );
 
   const timer = setTimeout(() => proc.kill(), RESOLVE_TIMEOUT_MS);

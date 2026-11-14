@@ -89,3 +89,13 @@ remembered (0.0.5 and 0.0.6).
 It sent its request with `fetch`, which goes around a proxy for hosts in `NO_PROXY`, so it failed
 on machines whose `NO_PROXY` covers localhost. It now writes the request to the bridge by hand, the
 way ffmpeg does.
+
+### Seeking stopped YouTube videos: yt-dlp had no JavaScript runtime (fixed)
+
+yt-dlp was told `--js-runtimes bun`, which needs `bun` on the PATH. A Sharkord server is one
+compiled Bun program, so there was none: yt-dlp warned "No supported JavaScript runtime could be
+found", skipped YouTube's challenge, and its links played from the start but refused the range
+requests that a seek or resume makes. The retry without the challenge failed the same way, and the
+session ended. yt-dlp now gets `bun:<the running executable>`, started with `BUN_BE_BUN=1`, which
+makes a compiled Bun program act as the `bun` CLI (checked with Bun 1.4.0; Sharkord 0.0.31 is built
+with 1.4.4). Reported by the owner on Sharkord 0.0.31.
