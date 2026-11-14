@@ -403,6 +403,11 @@ const sourceArgs = (input: TInput, guard: string): string[] => {
     "1",
     "-reconnect_delay_max",
     "5",
+    // fetched in bounded ranges, as yt-dlp does. Otherwise ffmpeg opens `bytes=0-` and reaches a
+    // seek point by reading through everything before it, which YouTube serves at about playback
+    // speed: a seek or resume minutes in then takes minutes to start.
+    "-request_size",
+    String(10 * 1024 * 1024),
     ...(headers ? ["-headers", headers] : []),
     // always: the guard keeps ffmpeg off the server's own network, and goes on through the admin's
     // proxy, since YouTube's media urls only work from the IP that resolved them
@@ -423,6 +428,13 @@ const inputArgs = (input: TInput, startSec: number, guard: string): string[] => 
     "-i",
     input.url,
   ];
+};
+
+/** "2500k" or "2.5M" (the setting, already checked) in bits per second */
+const bitsOf = (rate: string): number => {
+  const unit = { k: 1e3, m: 1e6 }[rate.slice(-1).toLowerCase()] ?? 1;
+
+  return parseFloat(rate) * unit;
 };
 
 /**
@@ -455,6 +467,8 @@ const buildFfmpegArgs = (o: TFfmpegOptions): string[] => {
         : generated("anullsrc=r=48000:cl=stereo");
 
   const h = Math.min(1080, Math.max(144, Math.round(o.maxHeight)));
+  // an IPv6 address goes in brackets in a url
+  const host = o.rtpHost.includes(":") ? `[${o.rtpHost}]` : o.rtpHost;
 
   args.push(
     "-map",
@@ -476,8 +490,11 @@ const buildFfmpegArgs = (o: TFfmpegOptions): string[] => {
     o.videoBitrate,
     "-maxrate",
     o.videoBitrate,
+    // a fifth of a second. The rate control lets a keyframe grow to this, and it leaves as one
+    // burst of UDP packets; a full second's worth (~300 KB at 2500k) overflowed the receiving
+    // socket, and every packet lost costs the viewer a frozen picture until the next keyframe
     "-bufsize",
-    o.videoBitrate,
+    String(Math.round(bitsOf(o.videoBitrate) / 5)),
     // a keyframe every 2s: nothing feeds picture loss back over a plain transport,
     // so this is how a viewer who joins late gets a picture
     "-g",
@@ -492,7 +509,7 @@ const buildFfmpegArgs = (o: TFfmpegOptions): string[] => {
     String(o.videoSsrc),
     "-f",
     "rtp",
-    `rtp://${o.rtpHost}:${o.videoPort}?pkt_size=1200`,
+    `rtp://${host}:${o.videoPort}?pkt_size=1200`,
 
     "-map",
     `${a}:a:0`,
@@ -512,7 +529,7 @@ const buildFfmpegArgs = (o: TFfmpegOptions): string[] => {
     String(o.audioSsrc),
     "-f",
     "rtp",
-    `rtp://${o.rtpHost}:${o.audioPort}?pkt_size=1200`,
+    `rtp://${host}:${o.audioPort}?pkt_size=1200`,
   );
 
   return args;

@@ -71,7 +71,14 @@ pins is in RELEASING.md. Checking yt-dlp's signature on `SHA2-256SUMS` is left f
 
 ## Open items
 
-None.
+- yt-dlp 2026.10.26 warns that Bun 1.4.4 (Sharkord 0.0.31's) is newer than the last Bun it supports,
+  1.3.14. YouTube still played and seeked on a test server with it. If YouTube starts refusing,
+  check that warning first, and whether a newer yt-dlp supports the newer Bun.
+- Sharkord's client can miss a swap when two arrive close together: it logs "skipped, consume
+  already in progress" and keeps the producer that was just closed, so that viewer's picture stops
+  until the next seek, pause or rejoin. Seen once on a test server with seeks a few seconds apart.
+  Keeping one pair of producers for the whole session would avoid swaps; that needs a transport
+  that accepts a new sender, which comedia doesn't.
 
 ## Bug log
 
@@ -99,3 +106,33 @@ requests that a seek or resume makes. The retry without the challenge failed the
 session ended. yt-dlp now gets `bun:<the running executable>`, started with `BUN_BE_BUN=1`, which
 makes a compiled Bun program act as the `bun` CLI (checked with Bun 1.4.0; Sharkord 0.0.31 is built
 with 1.4.4). Reported by the owner on Sharkord 0.0.31.
+
+That fix was right but wasn't the cause: the owner still couldn't seek on 0.0.8. See the next entry.
+
+### Seeking and resuming sat on "Loading" for minutes (fixed)
+
+Found by running Sharkord 0.0.31 with the plugin and a headless Chrome in the voice channel, then
+seeking Big Buck Bunny from YouTube. After a seek the new ffmpeg never sent a packet, so the
+stream stayed on "Loading". Run by hand, the same ffmpeg took 318 seconds to open the link at
+45 seconds in, and two seconds once open. Its debug log said why: it opens the file with
+`Range: bytes=0-`, and reaches the seek point by "soft-seeking", reading and discarding everything
+up to it (12.5 MB) on that one connection. YouTube serves an open-ended request at about playback
+speed (40 KB/s here), while bounded ranges came at 7 to 16 MB/s. Playing from the start never
+noticed, since playback speed is enough. `-request_size` (10 MB, like yt-dlp's chunks) makes every
+request bounded, so a seek is a new range request: seeks to 0:45 and 5:00 opened in about a second.
+
+### The picture froze for seconds after a seek (fixed)
+
+The same test showed viewers decoding one GOP after each seek, then losing packets on localhost,
+with the decoder waiting for a keyframe that also lost packets. A plain transport has no
+retransmission, so each lost packet freezes the picture until a keyframe arrives whole. The bursts
+were keyframes: `-bufsize` equal to the bitrate let x264 make a keyframe up to a second's worth
+(about 300 KB at 2500k), sent as one burst of UDP packets, which overflowed the receiving socket.
+At a fifth of a second (500 kbit at 2500k), three seeks lost nothing and played at
+25 fps. Windows' small default socket buffer made it frequent there; Linux's default (208 KB) is
+still smaller than a full second's keyframe.
+
+### ffmpeg's packets were refused on Windows (fixed)
+
+ffmpeg sent RTP to the address the transports listen on, `0.0.0.0`. Linux takes that as this
+machine; Windows refuses it (error 10049). The wildcard is now sent to loopback.

@@ -85,3 +85,15 @@ test("yt-dlp solves YouTube's challenge with the running executable as bun, unle
   expect(fallback).toContain("--no-js-runtimes");
   expect(fallback).not.toContain("--js-runtimes");
 });
+
+test("seeks fetch bounded ranges, keyframes stay small, and IPv6 hosts get brackets", () => {
+  const media = parseYtDlpInfo({ title: "x", duration: 600, url: "https://v.example/f", vcodec: "avc1", acodec: "mp4a" }, "https://src");
+  const args = buildFfmpegArgs({ ...base, media, startSec: 300 }).join(" ");
+
+  // without it ffmpeg reads up to the seek point at YouTube's throttled speed
+  expect(args).toContain(`-request_size ${10 * 1024 * 1024} `);
+  // 2500k over a fifth of a second
+  expect(args).toContain("-bufsize 500000 ");
+  expect(buildFfmpegArgs({ ...base, media, startSec: 0, videoBitrate: "2.5M" }).join(" ")).toContain("-bufsize 500000 ");
+  expect(buildFfmpegArgs({ ...base, media, startSec: 0, rtpHost: "::1" }).join(" ")).toContain("rtp://[::1]:1000?");
+});
