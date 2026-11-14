@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { buildFfmpegArgs, parseProbe, parseYtDlpInfo } from "./media";
+import { buildFfmpegArgs, parseProbe, parseYtDlpInfo, ytDlpArgs } from "./media";
 
 const base = { maxHeight: 720, videoBitrate: "2500k", guard: "http://shiver:x@127.0.0.1:1", rtpHost: "127.0.0.1", videoPort: 1000, audioPort: 2000, videoSsrc: 1, audioSsrc: 2 };
 
@@ -70,4 +70,18 @@ test("probing a direct file reads its real tracks and length", () => {
   expect(silent).toEqual({ video: true, audio: false, durationSec: 70.5 });
   expect(mp3).toEqual({ video: false, audio: true, durationSec: 3600 });
   expect(parseProbe("  Duration: N/A\n").durationSec).toBeNull();
+});
+
+test("yt-dlp solves YouTube's challenge with the running executable as bun, unless falling back", () => {
+  const opts = { maxHeight: 720, guard: "http://shiver:x@127.0.0.1:1" };
+  const runtime = (args: string[]) => args[args.indexOf("--js-runtimes") + 1];
+
+  expect(runtime(ytDlpArgs("https://y", opts))).toBe(`bun:${process.execPath}`);
+  // a Windows path keeps its drive letter: yt-dlp splits RUNTIME:PATH at the first colon
+  expect(runtime(ytDlpArgs("https://y", { ...opts, jsRuntime: "C:\Sharkord\sharkord.exe" }))).toBe("bun:C:\Sharkord\sharkord.exe");
+
+  const fallback = ytDlpArgs("https://y", { ...opts, fallback: true });
+
+  expect(fallback).toContain("--no-js-runtimes");
+  expect(fallback).not.toContain("--js-runtimes");
 });

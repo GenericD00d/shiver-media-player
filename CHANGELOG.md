@@ -2,6 +2,16 @@
 
 Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
+## Unreleased
+
+### Fixed
+
+- YouTube videos can be seeked, paused and resumed again. yt-dlp needs a JavaScript runtime for
+  YouTube's challenge and was looking for `bun` on the server's PATH, which a Sharkord server
+  rarely has, so it warned "No supported JavaScript runtime could be found" and got links that
+  play from the start but refuse the requests a seek makes. It now runs the challenge with the
+  Sharkord executable itself, as Bun.
+
 ## 0.0.7 (2026-11-13)
 
 ### Added
