@@ -2,6 +2,19 @@
 
 Entries up to 0.0.6 were reconstructed from the commit history on 2026-11-13.
 
+## Unreleased
+
+### Fixed
+
+- Seeking and resuming YouTube videos work: the picture comes back within a second or two. ffmpeg
+  reached the new position by reading through everything before it, which YouTube serves at about
+  playback speed, so a seek a minute in sat on "Loading" for minutes. It now fetches in 10 MB
+  ranges and jumps straight there. Found on a test server; 0.0.8's fix alone wasn't enough.
+- The picture no longer freezes for seconds at a time. Keyframes went out as one burst of a few
+  hundred packets, which could overflow the server's receiving socket, and a lost packet froze
+  viewers until the next keyframe. Keyframes are now capped at a fifth of a second of the bitrate.
+- Playback works on a Windows server, which refused ffmpeg's packets addressed to `0.0.0.0`.
+
 ## 0.0.8 (2026-11-14)
 
 ### Fixed

@@ -264,7 +264,9 @@ const startAt = async (s: TSession, sec: number) => {
         maxHeight: settings!.maxHeight(),
         videoBitrate: settings!.videoBitrate(),
         guard: g.url,
-        rtpHost: ip,
+        // ffmpeg sends to where the transports listen; a wildcard there means this machine, which
+        // Linux accepts as a destination and Windows refuses (WSAEADDRNOTAVAIL)
+        rtpHost: ip === "0.0.0.0" ? "127.0.0.1" : ip === "::" ? "::1" : ip,
         videoPort: vt.tuple.localPort,
         audioPort: at.tuple.localPort,
         videoSsrc,

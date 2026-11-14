@@ -116,7 +116,7 @@ grant playback to people you trust with its bandwidth.
   cookies to `<data-dir>/plugin-data/shiver-media-player/bin/cookies.txt`, or set the **Proxy** setting.
 - Errors from yt-dlp and ffmpeg are in the plugin's **Logs** tab.
 - **"No supported JavaScript runtime could be found"** in the logs: yt-dlp couldn't run YouTube's
-  challenge, so videos play but stop when seeked or resumed. From 0.0.8 the plugin runs it with
+  challenge. From 0.0.8 the plugin runs it with
   the Sharkord executable itself (Bun, with `BUN_BE_BUN=1`); Sharkord 0.0.31 is built with Bun
   1.4.4, which supports that. If the warning stays, install `bun` or `deno` on the server's PATH.
 
